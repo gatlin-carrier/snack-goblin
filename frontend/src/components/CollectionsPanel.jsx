@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 export default function CollectionsPanel({ showToast, onFilterByCollection }) {
   const [collections, setCollections] = useState([]);
@@ -54,15 +55,22 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
     <div className="page">
       <div className="page-header">
         <div>
-          <div className="page-title">Collections</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
-            {collections.length} collection{collections.length !== 1 ? 's' : ''}
+          <div style={{
+            fontSize: 11, color: THEME.accent, fontWeight: 700,
+            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+          }}>Themes</div>
+          <div style={{
+            fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+          }}>Collections</div>
+          <div style={{ fontSize: 13, color: THEME.dim, marginTop: 6 }}>
+            <span style={{ color: THEME.ink, fontFamily: display, fontStyle: 'italic', fontWeight: 500, fontSize: 18, marginRight: 4 }}>{collections.length}</span>
+            collection{collections.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
 
-      {/* Add new collection */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
         <input
           value={newName}
           onChange={e => setNewName(e.target.value)}
@@ -70,64 +78,72 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
           placeholder="New collection name…"
           style={{ flex: 1 }}
         />
-        <button className="btn-primary" onClick={add} disabled={!newName.trim() || adding}>
+        <button style={{ ...glassBtnPrimary, opacity: (!newName.trim() || adding) ? 0.5 : 1 }} onClick={add} disabled={!newName.trim() || adding}>
           {adding ? '…' : '+ Create'}
         </button>
       </div>
 
       {collections.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🗂</div>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>No collections yet</div>
-          <div style={{ fontSize: 13 }}>Group recipes by theme — "High Protein", "Kid Favorites", "Date Night", whatever fits your family.</div>
-        </div>
+        <Glass padding={48} style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 38, marginBottom: 12 }}>🗂</div>
+          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
+            No collections yet
+          </div>
+          <div style={{ fontSize: 13, color: THEME.dim, lineHeight: 1.55 }}>
+            Group recipes by theme — "High Protein", "Kid Favorites", "Date Night", whatever fits your family.
+          </div>
+        </Glass>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {collections.map(col => (
-            <div key={col.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <Glass key={col.id} padding={0} style={{ overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
                 <div style={{ fontSize: 22 }}>🗂</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{col.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: THEME.ink }}>{col.name}</div>
+                  <div style={{ fontSize: 12, color: THEME.dim, marginTop: 2 }}>
                     {col.recipe_count || 0} recipe{col.recipe_count !== 1 ? 's' : ''}
                   </div>
                 </div>
                 {onFilterByCollection && (
-                  <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }}
+                  <button style={{ ...glassBtnGhost, fontSize: 12, padding: '5px 12px' }}
                     onClick={() => onFilterByCollection(col)}>
                     Browse →
                   </button>
                 )}
                 <button onClick={() => expand(col)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>
+                  style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 14, padding: '4px 6px' }}>
                   {expanded === col.id ? '▲' : '▼'}
                 </button>
                 <button onClick={() => remove(col)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18, padding: '2px 4px' }}>✕</button>
+                  style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 16, padding: '2px 4px' }}>✕</button>
               </div>
 
               {expanded === col.id && (
-                <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px 12px' }}>
+                <div style={{ borderTop: `1px solid ${THEME.hairline}`, padding: '8px 16px 14px' }}>
                   {expandedRecipes.length === 0 ? (
-                    <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 0' }}>
+                    <div style={{ fontSize: 13, color: THEME.dim, padding: '8px 0', fontStyle: 'italic' }}>
                       No recipes yet. Open a recipe and use "+ Collection" to add it here.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {expandedRecipes.map(r => (
-                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{r.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{r.cuisine}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {expandedRecipes.map((r, i) => (
+                        <div key={r.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 0',
+                          borderTop: i > 0 ? `1px solid ${THEME.hairline}` : 'none',
+                        }}>
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: THEME.ink }}>{r.name}</div>
+                          <div style={{ fontSize: 12, color: THEME.dim }}>{r.cuisine}</div>
                           <button onClick={() => removeFromCollection(col.id, r.id, r.name)}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✕</button>
+                            style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✕</button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               )}
-            </div>
+            </Glass>
           ))}
         </div>
       )}

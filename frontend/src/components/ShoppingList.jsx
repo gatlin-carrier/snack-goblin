@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
+import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const CATEGORY_LABELS = {
   produce: '🥦 Produce',
-  meat: '🥩 Meat & Poultry',
+  meat:    '🥩 Meat & Poultry',
   seafood: '🐟 Seafood',
-  dairy: '🧀 Dairy & Eggs',
-  frozen: '🧊 Frozen',
-  bakery: '🍞 Bakery',
-  pantry: '🫙 Pantry & Dry Goods',
+  dairy:   '🧀 Dairy & Eggs',
+  frozen:  '🧊 Frozen',
+  bakery:  '🍞 Bakery',
+  pantry:  '🫙 Pantry & Dry Goods',
 };
 
 export default function ShoppingList({ currentPlan, showToast }) {
@@ -34,12 +35,11 @@ export default function ShoppingList({ currentPlan, showToast }) {
     if (!currentPlan?.id) { showToast('No active meal plan'); return; }
     setGenerating(true);
     try {
-      const res = await fetch('/api/shopping-lists', {
+      await fetch('/api/shopping-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meal_plan_id: currentPlan.id }),
       });
-      const data = await res.json();
       loadList(currentPlan.id);
       showToast('Shopping list generated!');
     } catch {
@@ -71,18 +71,20 @@ export default function ShoppingList({ currentPlan, showToast }) {
   }
 
   if (loading) {
-    return <div className="page"><div style={{ color: 'var(--text-dim)', display: 'flex', gap: 10 }}><div className="spinner" /> Loading...</div></div>;
+    return <div className="page"><div style={{ color: THEME.dim, display: 'flex', gap: 10 }}><div className="spinner" /> Loading…</div></div>;
   }
 
   if (!currentPlan?.id) {
     return (
       <div className="page">
-        <div className="page-title" style={{ marginBottom: 24 }}>Shopping List</div>
-        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🛒</div>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>No active meal plan</div>
-          <div style={{ color: 'var(--text-dim)' }}>Build a meal plan first, then generate your shopping list here.</div>
-        </div>
+        <PageHeader eyebrow="To buy" title="Shopping list" />
+        <Glass padding={48} style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
+          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
+            No active meal plan
+          </div>
+          <div style={{ color: THEME.dim }}>Build a meal plan first, then generate your shopping list here.</div>
+        </Glass>
       </div>
     );
   }
@@ -90,24 +92,23 @@ export default function ShoppingList({ currentPlan, showToast }) {
   if (!list) {
     return (
       <div className="page">
-        <div className="page-header">
-          <div className="page-title">Shopping List</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🛒</div>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>No shopping list yet</div>
-          <div style={{ color: 'var(--text-dim)', marginBottom: 24 }}>
+        <PageHeader eyebrow="To buy" title="Shopping list" />
+        <Glass padding={48} style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
+          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
+            No shopping list yet
+          </div>
+          <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14 }}>
             Generate a shopping list from your meal plan.
           </div>
-          <button className="btn-primary" onClick={generate} disabled={generating}>
-            {generating ? 'Generating...' : 'Generate Shopping List'}
+          <button style={{ ...glassBtnPrimary, opacity: generating ? 0.5 : 1 }} onClick={generate} disabled={generating}>
+            {generating ? 'Generating…' : 'Generate shopping list'}
           </button>
-        </div>
+        </Glass>
       </div>
     );
   }
 
-  // Group by category
   const grouped = {};
   for (const item of list.items) {
     const cat = item.category || 'pantry';
@@ -116,65 +117,119 @@ export default function ShoppingList({ currentPlan, showToast }) {
   }
 
   const total = list.items.length;
-  const checked = list.items.filter(i => i.checked).length;
-  const allDone = total > 0 && checked === total;
+  const checkedCount = list.items.filter(i => i.checked).length;
+  const allDone = total > 0 && checkedCount === total;
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <div className="page-title">Shopping List</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>
-            {checked}/{total} items checked
+          <div style={{
+            fontSize: 11, color: THEME.accent, fontWeight: 700,
+            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+          }}>To buy</div>
+          <div style={{
+            fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+          }}>Shopping list</div>
+          <div style={{ color: THEME.dim, fontSize: 13, marginTop: 6 }}>
+            <span style={{
+              color: THEME.ink, fontFamily: display, fontStyle: 'italic',
+              fontWeight: 500, fontSize: 18,
+            }}>{checkedCount}</span>{' '}
+            <span style={{ color: THEME.faint }}>/ {total}</span> items checked
           </div>
         </div>
-        <div className="page-header-actions">
-          <button className="btn-ghost" onClick={copyList}>📋 Copy List</button>
-          <button className="btn-ghost" onClick={generate} disabled={generating}>
-            {generating ? 'Regenerating...' : '🔄 Regenerate'}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={glassBtnGhost} onClick={copyList}>📋 Copy</button>
+          <button style={{ ...glassBtnGhost, opacity: generating ? 0.5 : 1 }} onClick={generate} disabled={generating}>
+            {generating ? 'Regenerating…' : '🔄 Regenerate'}
           </button>
-          {process.env.INSTACART_API_KEY ? (
-            <button className="btn-primary" disabled>
-              🛒 Send to Instacart
-            </button>
-          ) : (
-            <button
-              className="btn-ghost"
-              title="Apply for Instacart API at developers.instacart.com"
-              disabled
-              style={{ opacity: 0.5 }}
-            >
-              🛒 Instacart (API pending)
-            </button>
-          )}
+          <button
+            style={{ ...glassBtnGhost, opacity: 0.5 }}
+            title="Apply for Instacart API at developers.instacart.com"
+            disabled
+          >
+            🛒 Instacart (API pending)
+          </button>
         </div>
       </div>
 
       {allDone && (
-        <div className="card" style={{ background: 'rgba(74,222,128,0.08)', borderColor: 'rgba(74,222,128,0.3)', marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 6 }}>🎉</div>
-          <div style={{ fontWeight: 600 }}>All done! Happy cooking.</div>
-        </div>
+        <Glass tint="oklch(0.55 0.10 145 / 0.20)" padding={20} style={{ marginBottom: 22, textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🎉</div>
+          <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', color: THEME.ink }}>
+            All done · happy cooking
+          </div>
+        </Glass>
       )}
 
-      {Object.entries(grouped).map(([cat, items]) => (
-        <div key={cat} className="shop-category">
-          <div className="shop-category-title">{CATEGORY_LABELS[cat] || cat}</div>
-          {items.map(item => (
-            <div key={item.id} className={`shop-item${item.checked ? ' checked' : ''}`}>
-              <input
-                type="checkbox"
-                checked={!!item.checked}
-                onChange={() => toggleItem(item)}
-              />
-              <div className="shop-item-name">{item.ingredient_name}</div>
-              <div className="shop-item-qty">
-                {item.quantity ? `${item.quantity} ${item.unit || ''}`.trim() : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {Object.entries(grouped).map(([cat, items]) => (
+          <Glass key={cat} padding={4}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: THEME.accent,
+              letterSpacing: '0.16em', textTransform: 'uppercase',
+              padding: '14px 16px 10px',
+            }}>{CATEGORY_LABELS[cat] || cat}</div>
+            {items.map((item, i) => (
+              <label
+                key={item.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '11px 16px',
+                  borderTop: `1px solid ${THEME.hairline}`,
+                  cursor: 'pointer',
+                  opacity: item.checked ? 0.45 : 1,
+                  transition: 'opacity 200ms ease',
+                }}
+              >
+                <div
+                  onClick={() => toggleItem(item)}
+                  style={{
+                    width: 22, height: 22, borderRadius: 7, flexShrink: 0,
+                    background: item.checked
+                      ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                      : 'oklch(1 0 0 / 0.55)',
+                    boxShadow: item.checked
+                      ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.4)'
+                      : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, color: 'white', fontWeight: 700,
+                  }}>{item.checked ? '✓' : ''}</div>
+                <div style={{
+                  flex: 1, fontSize: 14, fontWeight: 500, color: THEME.ink,
+                  textDecoration: item.checked ? 'line-through' : 'none',
+                  textDecorationColor: THEME.faint,
+                }}>{item.ingredient_name}</div>
+                <div style={{
+                  fontSize: 12, color: THEME.dim, fontVariantNumeric: 'tabular-nums',
+                  textAlign: 'right',
+                }}>
+                  {item.quantity ? `${item.quantity} ${item.unit || ''}`.trim() : ''}
+                </div>
+              </label>
+            ))}
+          </Glass>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PageHeader({ eyebrow, title }) {
+  return (
+    <div className="page-header">
+      <div>
+        <div style={{
+          fontSize: 11, color: THEME.accent, fontWeight: 700,
+          letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+        }}>{eyebrow}</div>
+        <div style={{
+          fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
+          color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+        }}>{title}</div>
+      </div>
     </div>
   );
 }

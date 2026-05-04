@@ -12,6 +12,7 @@ services:
       - DB_PATH=/data/meal-planner.db
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - INSTACART_API_KEY=${INSTACART_API_KEY:-}
+      - PEXELS_API_KEY=${PEXELS_API_KEY:-}
     dns:
       - 8.8.8.8
       - 1.1.1.1

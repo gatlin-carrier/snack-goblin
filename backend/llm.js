@@ -5,6 +5,7 @@ const DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
   google: 'gemini-1.5-pro',
+  groq: 'llama-3.3-70b-versatile',
   ollama: 'llama3.2',
   lmstudio: 'local-model',
   custom: '',
@@ -73,6 +74,18 @@ async function chat(userMessage, settings, { maxTokens = 4096, systemPrompt = nu
       return res.choices[0].message.content;
     }
 
+    case 'groq': {
+      // Groq is OpenAI-compatible at api.groq.com/openai/v1
+      const client = getOpenAIClient(settings.api_key, 'https://api.groq.com/openai/v1');
+      const messages = systemPrompt
+        ? [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }]
+        : [{ role: 'user', content: userMessage }];
+      const reqBody = { model, max_tokens: maxTokens, messages };
+      if (jsonMode) reqBody.response_format = { type: 'json_object' };
+      const res = await client.chat.completions.create(reqBody);
+      return res.choices[0].message.content;
+    }
+
     case 'google': {
       const { GoogleGenerativeAI } = require('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(settings.api_key);
@@ -89,7 +102,11 @@ async function chat(userMessage, settings, { maxTokens = 4096, systemPrompt = nu
         lmstudio: 'http://localhost:1234/v1',
         custom: 'http://localhost:8080/v1',
       };
-      const baseURL = settings.ollama_base_url || defaultUrls[provider];
+      let baseURL = settings.ollama_base_url || defaultUrls[provider];
+      // Ollama's OpenAI-compat shim lives at /v1 — ensure suffix even if user/auto-detect saved without it
+      if (provider === 'ollama' && !/\/v1\/?$/.test(baseURL)) {
+        baseURL = baseURL.replace(/\/$/, '') + '/v1';
+      }
       const client = getOpenAIClient(settings.api_key || provider, baseURL);
       const messages = systemPrompt
         ? [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }]

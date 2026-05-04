@@ -323,6 +323,7 @@ function getLLMSettings() {
       if (cfg.provider === 'anthropic') apiKey = process.env.ANTHROPIC_API_KEY;
       else if (cfg.provider === 'openai') apiKey = process.env.OPENAI_API_KEY;
       else if (cfg.provider === 'google') apiKey = process.env.GOOGLE_API_KEY;
+      else if (cfg.provider === 'groq') apiKey = process.env.GROQ_API_KEY;
     }
     return { provider: cfg.provider, model: cfg.model || undefined, api_key: apiKey, ollama_base_url: cfg.base_url || undefined };
   }
@@ -541,6 +542,8 @@ ${ctx.guidance}
 
 ${mode === 'quick'
   ? '⚡ QUICK MODE — Every recipe MUST have prep_time_min + cook_time_min ≤ 30 combined. No braises, slow cooks, or marinating. Choose fast techniques only: stir-fry, sauté, one-pan, quick assembly. State this clearly in instructions.'
+  : mode === 'adhd'
+  ? '✨ ADHD/NOVELTY MODE — Optimize for VARIETY and INTEREST over efficiency. Every recipe must use a DIFFERENT primary protein, a DIFFERENT cuisine, and a DIFFERENT cooking technique from the others in this batch. Lean toward visually striking, dopamine-hit dishes — bold colors, unusual textures, unexpected flavor pairings. Across the batch, no more than 2 ingredients should repeat. Forget batch prep efficiency entirely — prioritize that each meal feels NEW. Include short technique-reasoning callouts in instructions to keep cooking engaging ("we use cold butter here for flakier results"). batch_prep_notes can simply say "Make fresh — this one rewards in-the-moment cooking."'
   : 'TIMING CONSTRAINT: Active hands-on cooking time must be realistic for a weeknight. Write instructions in clear, confidence-building steps with technique reasoning where helpful ("pat the chicken dry — this helps browning"). Include a batch_prep_notes field noting what can be prepped 1–3 days ahead for this specific recipe (e.g., "the marinade keeps 3 days refrigerated; the vegetables can be chopped the night before").'}
 
 ${equipmentCtx ? equipmentCtx + '\n' : ''}FAMILY PREFERENCES:
@@ -636,8 +639,8 @@ function getProviderCapabilities(settings) {
     provider,
     isLocal,
     webSearch: provider === 'anthropic',
-    // OpenAI-compat servers (incl. Ollama since v0.5) honor response_format json_object
-    jsonMode: provider === 'openai' || isLocal,
+    // OpenAI-compat servers (OpenAI, Groq, Ollama 0.5+, LM Studio) honor response_format json_object
+    jsonMode: ['openai', 'groq'].includes(provider) || isLocal,
     // Local context windows are typically 8k; cloud is much larger
     contextWindow: isLocal ? 8000 : 100000,
     // Single-shot batch size — cloud models can write 12 full recipes in one go, local can't
@@ -661,10 +664,13 @@ function tryParseJSON(text, expectArray = true) {
 function buildBaseRecipePrompt(mealType, count, prefs, mode) {
   const ctx = MEAL_TYPE_CONTEXT[mealType] || MEAL_TYPE_CONTEXT.dinner;
   const quickLine = mode === 'quick' ? '\nEVERY recipe must be completable in 30 minutes total.' : '';
+  const adhdLine = mode === 'adhd'
+    ? '\n✨ NOVELTY MODE: every recipe MUST use a different primary protein, different cuisine, and different cooking technique from the others. Prefer bold, dopamine-hit dishes. No ingredient should repeat in more than 2 recipes.'
+    : '';
   const excluded = (prefs?.ingredients?.excluded || []).join(', ') || 'none';
   return `You are a thoughtful family-meal recipe generator. Generate ${count} diverse ${mealType} recipes.
 ${ctx.guidance}
-Vary cuisines and flavors — avoid repeating the same cuisine more than twice.${quickLine}
+Vary cuisines and flavors — avoid repeating the same cuisine more than twice.${quickLine}${adhdLine}
 Excluded ingredients: ${excluded}.
 
 Respond ONLY with a JSON object of the form: {"recipes": [...]} where each recipe has these fields and NOTHING else:
@@ -1141,7 +1147,7 @@ app.post('/api/recipes/generate', llmLimiter, async (req, res) => {
     dinner:    clampInt(req.body.dinner ?? req.body.count, 0, 20, 0),
     snack:     clampInt(req.body.snack,     0, 20, 0),
   };
-  const mode = req.body.mode === 'quick' ? 'quick' : 'batch';
+  const mode = ['quick', 'adhd'].includes(req.body.mode) ? req.body.mode : 'batch';
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total === 0) return res.status(400).json({ error: 'Specify at least one meal type count' });
   if (total > 50) return res.status(400).json({ error: 'Total recipe count cannot exceed 50' });
@@ -1429,8 +1435,8 @@ app.get('/api/meal-plans/current', (req, res) => {
       SELECT mpi.*, r.name, r.description, r.cuisine, r.meal_type as recipe_meal_type,
              r.prep_time_min, r.cook_time_min, r.nutrition, r.toddler_safe,
              r.choking_hazards, r.toddler_notes, r.batch_prep_notes,
-             r.oven_temp, r.tags, r.ingredients, r.star_rating, r.rating_count,
-             r.cost_per_serving
+             r.oven_temp, r.tags, r.ingredients, r.instructions, r.star_rating, r.rating_count,
+             r.cost_per_serving, r.image_url, r.image_attribution, r.image_source_url
       FROM meal_plan_items mpi
       JOIN recipes r ON r.id = mpi.recipe_id
       WHERE mpi.meal_plan_id = ?
@@ -1445,6 +1451,7 @@ app.get('/api/meal-plans/current', (req, res) => {
         choking_hazards: JSON.parse(row.choking_hazards || '[]'),
         tags: JSON.parse(row.tags || '[]'),
         ingredients: JSON.parse(row.ingredients || '[]'),
+        instructions: JSON.parse(row.instructions || '[]'),
       })),
     });
   } catch (err) {
@@ -1516,7 +1523,7 @@ app.post('/api/meal-plans/:id/auto-curate', (req, res) => {
     const plan = db.prepare('SELECT id FROM meal_plans WHERE id = ?').get(planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    const strategy = req.body.strategy === 'top-rated' ? 'top-rated' : 'overlap';
+    const strategy = ['top-rated', 'novelty', 'overlap'].includes(req.body.strategy) ? req.body.strategy : 'overlap';
     const days = clampInt(req.body.days, 1, 7, 5);
     const mealType = req.body.meal_type || 'dinner';
     const altCount = clampInt(req.body.alternates, 0, 20, 8);
@@ -1539,8 +1546,11 @@ app.post('/api/meal-plans/:id/auto-curate', (req, res) => {
     };
 
     let picked = [];
-    if (strategy === 'overlap') {
-      // Greedy: start with top-rated, then iteratively add the recipe with highest ingredient overlap with the running set
+    if (strategy === 'overlap' || strategy === 'novelty') {
+      // Both strategies are greedy with the same shape — only the score sign differs.
+      // overlap: maximize shared ingredients (cheaper batch shopping)
+      // novelty: minimize shared ingredients (ADHD/variety mode — every meal feels new)
+      const isNovelty = strategy === 'novelty';
       const remaining = [...candidates];
       const first = remaining.shift();
       picked.push(first);
@@ -1548,14 +1558,14 @@ app.post('/api/meal-plans/:id/auto-curate', (req, res) => {
 
       while (picked.length < days && remaining.length) {
         let bestIdx = 0;
-        let bestScore = -1;
+        let bestScore = -Infinity;
         for (let i = 0; i < remaining.length; i++) {
           const ing = ingSet(remaining[i]);
           let overlap = 0;
           for (const x of ing) if (usedIngredients.has(x)) overlap++;
-          // Tiebreak by quality score
           const quality = (remaining[i].star_rating || 0) * (remaining[i].rating_count || 0);
-          const score = overlap * 1000 + quality;
+          // For novelty, invert overlap (negative weight) so MIN-overlap wins; quality is tiebreaker
+          const score = (isNovelty ? -overlap : overlap) * 1000 + quality;
           if (score > bestScore) { bestScore = score; bestIdx = i; }
         }
         const next = remaining.splice(bestIdx, 1)[0];
@@ -2141,6 +2151,7 @@ app.post('/api/llm-configs/:id/test', async (req, res) => {
       if (cfg.provider === 'anthropic') apiKey = process.env.ANTHROPIC_API_KEY;
       else if (cfg.provider === 'openai') apiKey = process.env.OPENAI_API_KEY;
       else if (cfg.provider === 'google') apiKey = process.env.GOOGLE_API_KEY;
+      else if (cfg.provider === 'groq') apiKey = process.env.GROQ_API_KEY;
     }
     const settings = { provider: cfg.provider, model: cfg.model || undefined, api_key: apiKey, ollama_base_url: cfg.base_url || undefined };
     const response = await chat('Reply with exactly one word: OK', settings, { maxTokens: 10 });
@@ -2210,7 +2221,8 @@ async function probeLLM({ provider, label, host, port, apiVersion }) {
       if (!r.ok) return null;
       const data = await r.json();
       const models = (data.models || []).map(m => m.name).sort();
-      return { provider, label, base_url: base, models };
+      // Save base_url with /v1 so the OpenAI-compat client hits Ollama's shim correctly
+      return { provider, label, base_url: `${base}/v1`, models };
     }
     // OpenAI-compat (LM Studio, Jan, LocalAI, llama.cpp, text-gen-webui, GPT4All)
     const endpoint = `${base}${apiVersion}/models`;
@@ -2222,25 +2234,91 @@ async function probeLLM({ provider, label, host, port, apiVersion }) {
   } catch { return null; }
 }
 
+// Standard known-LLM-server probes
+const LLM_PROBE_CANDIDATES = [
+  { provider: 'ollama',   label: 'Ollama',               port: 11434, apiVersion: '' },
+  { provider: 'lmstudio', label: 'LM Studio',            port: 1234,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'Jan',                  port: 1337,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'LocalAI',              port: 8080,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'llama.cpp',            port: 8081,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'text-gen-webui',       port: 5000,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'GPT4All',              port: 4891,  apiVersion: '/v1' },
+  { provider: 'custom',   label: 'Open WebUI backend',   port: 11435, apiVersion: '/v1' },
+];
+
+// Parse user-supplied "extra hosts" — accepts comma/newline separated entries:
+//  "192.168.5.10"            → host only, scan all standard ports
+//  "192.168.5.10:11434"      → exact host:port
+//  "http://192.168.5.10:1234" → URL form, exact host:port
+function parseExtraHosts(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  return raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean).map(entry => {
+    try {
+      // If it parses as a URL, use it directly
+      if (/^https?:\/\//i.test(entry)) {
+        const u = new URL(entry);
+        return { host: u.hostname, port: u.port ? Number(u.port) : 80, exact: true };
+      }
+      // host:port form
+      const m = entry.match(/^([^:]+):(\d+)$/);
+      if (m) return { host: m[1], port: Number(m[2]), exact: true };
+      // host only — will scan standard ports
+      return { host: entry, port: null, exact: false };
+    } catch { return null; }
+  }).filter(Boolean);
+}
+
+// Pull hosts from existing llm_configs so a host you've saved is automatically
+// re-scanned on standard ports (might find sibling services, e.g. you saved
+// Ollama at 192.168.5.10:11434 → also probe that host for LM Studio on 1234)
+function getHostsFromSavedConfigs() {
+  const cfgs = db.prepare("SELECT base_url FROM llm_configs WHERE base_url IS NOT NULL AND base_url != ''").all();
+  const hosts = new Set();
+  for (const c of cfgs) {
+    try {
+      const u = new URL(c.base_url);
+      if (u.hostname) hosts.add(u.hostname);
+    } catch {}
+  }
+  return [...hosts];
+}
+
 app.get('/api/detect-local-llms', async (req, res) => {
-  // Docker bridge host (Linux). Also try host.docker.internal for Docker Desktop.
-  const hosts = ['172.17.0.1', 'host.docker.internal'];
-
-  const candidates = [
-    { provider: 'ollama',   label: 'Ollama',               port: 11434, apiVersion: '' },
-    { provider: 'lmstudio', label: 'LM Studio',            port: 1234,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'Jan',                  port: 1337,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'LocalAI',              port: 8080,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'llama.cpp',            port: 8081,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'text-gen-webui',       port: 5000,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'GPT4All',              port: 4891,  apiVersion: '/v1' },
-    { provider: 'custom',   label: 'Open WebUI backend',   port: 11435, apiVersion: '/v1' },
-  ];
-
   const probes = [];
-  for (const host of hosts) {
-    for (const c of candidates) {
-      probes.push(probeLLM({ ...c, host }));
+  const scannedHosts = new Set();
+
+  // 1. Default hosts: docker bridge + Docker Desktop magic name
+  for (const host of ['172.17.0.1', 'host.docker.internal']) {
+    scannedHosts.add(host);
+    for (const c of LLM_PROBE_CANDIDATES) probes.push(probeLLM({ ...c, host }));
+  }
+
+  // 2. Hosts from existing llm_configs — scan standard ports on those too
+  for (const host of getHostsFromSavedConfigs()) {
+    if (scannedHosts.has(host)) continue;
+    scannedHosts.add(host);
+    for (const c of LLM_PROBE_CANDIDATES) probes.push(probeLLM({ ...c, host }));
+  }
+
+  // 3. User-supplied extra hosts (from settings)
+  const extraSetting = db.prepare("SELECT value FROM settings WHERE key = 'extra_llm_hosts'").get();
+  const extras = parseExtraHosts(extraSetting?.value);
+  for (const e of extras) {
+    if (e.exact) {
+      // Exact host:port — try every protocol type since user didn't specify
+      for (const c of LLM_PROBE_CANDIDATES) {
+        if (c.port === e.port) probes.push(probeLLM({ ...c, host: e.host }));
+      }
+      // If no candidate matched the user's port, try both ollama-style and openai-style
+      if (!LLM_PROBE_CANDIDATES.some(c => c.port === e.port)) {
+        probes.push(probeLLM({ provider: 'ollama', label: `Ollama @ ${e.host}:${e.port}`, host: e.host, port: e.port, apiVersion: '' }));
+        probes.push(probeLLM({ provider: 'custom', label: `Custom @ ${e.host}:${e.port}`, host: e.host, port: e.port, apiVersion: '/v1' }));
+      }
+      scannedHosts.add(`${e.host}:${e.port}`);
+    } else {
+      if (scannedHosts.has(e.host)) continue;
+      scannedHosts.add(e.host);
+      for (const c of LLM_PROBE_CANDIDATES) probes.push(probeLLM({ ...c, host: e.host }));
     }
   }
 
@@ -2255,7 +2333,7 @@ app.get('/api/detect-local-llms', async (req, res) => {
     found.push(r.value);
   }
 
-  res.json({ found });
+  res.json({ found, scanned_hosts: [...scannedHosts] });
 });
 
 // ─── Routes: Child Profile ────────────────────────────────────────────────────
@@ -2290,7 +2368,7 @@ app.get('/api/settings', (req, res) => {
   res.json(out);
 });
 
-const SETTINGS_ALLOWLIST = new Set(['child_dob', 'adult_goals', 'ntfy_url', 'ntfy_topic', 'ntfy_token', 'pexels_api_key']);
+const SETTINGS_ALLOWLIST = new Set(['child_dob', 'adult_goals', 'ntfy_url', 'ntfy_topic', 'ntfy_token', 'pexels_api_key', 'extra_llm_hosts']);
 
 app.post('/api/settings', (req, res) => {
   try {

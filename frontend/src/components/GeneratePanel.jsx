@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const MEAL_TYPES = [
-  { key: 'breakfast', label: 'Breakfast', icon: '🌅', default: 5 },
-  { key: 'lunch',     label: 'Lunch',     icon: '☀️',  default: 5 },
-  { key: 'dinner',    label: 'Dinner',    icon: '🌙',  default: 7 },
-  { key: 'snack',     label: 'Snacks',    icon: '🍎',  default: 4 },
+  { key: 'breakfast', label: 'Breakfast', tone: 'yellow', accent: 'oklch(0.55 0.12 80)' },
+  { key: 'lunch',     label: 'Lunch',     tone: 'sage',   accent: THEME.sage },
+  { key: 'dinner',    label: 'Dinner',    tone: 'accent', accent: THEME.accent },
+  { key: 'snack',     label: 'Snacks',    tone: 'rust',   accent: THEME.rust },
 ];
 
 function StatusIcon({ status }) {
   if (status === 'generating') return <div className="spinner" style={{ width: 16, height: 16 }} />;
-  if (status === 'done')       return <span style={{ color: 'var(--green)', fontSize: 16 }}>✓</span>;
-  if (status === 'error')      return <span style={{ color: 'var(--red)', fontSize: 16 }}>✕</span>;
-  return <span style={{ color: 'var(--border)', fontSize: 16 }}>○</span>;
+  if (status === 'done')       return <span style={{ color: THEME.sage, fontSize: 18, lineHeight: 1 }}>✓</span>;
+  if (status === 'error')      return <span style={{ color: THEME.red, fontSize: 18, lineHeight: 1 }}>✕</span>;
+  return <span style={{ color: THEME.faint, fontSize: 18, lineHeight: 1 }}>○</span>;
 }
 
 export default function GeneratePanel({ onGenerated, onClose }) {
@@ -23,13 +24,12 @@ export default function GeneratePanel({ onGenerated, onClose }) {
   const [progress, setProgress] = useState(null);
   const [activeLLM, setActiveLLM] = useState(null);
 
-  useState(() => {
+  useEffect(() => {
     fetch('/api/llm-configs').then(r => r.json()).then(configs => {
       const active = configs.find(c => c.is_active);
       if (active) setActiveLLM(active);
     }).catch(() => {});
-  });
-  // progress: { steps: { [mealType]: 'pending'|'generating'|'done'|'error' }, generated: { [mealType]: number }, totalGenerated: number }
+  }, []);
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const activeTypes = MEAL_TYPES.filter(m => counts[m.key] > 0);
@@ -99,140 +99,183 @@ export default function GeneratePanel({ onGenerated, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={done || !generating ? onClose : undefined}>
-      <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{ fontSize: 18, fontWeight: 700 }}>✨ Generate Recipes</div>
+          <div style={{
+            fontFamily: display, fontSize: 22, fontStyle: 'italic',
+            fontWeight: 500, color: THEME.ink,
+          }}>✨ Generate recipes</div>
           {!generating && <button className="modal-close" onClick={onClose}>×</button>}
         </div>
         <div className="modal-body">
 
           {!generating && !done ? (
             <>
-              <div style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 16 }}>
+              <div style={{ color: THEME.dim, fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
                 Choose how many recipes to generate per meal type.
-                {activeLLM && <span> Using <strong style={{ color: 'var(--text)' }}>{activeLLM.name}</strong> ({activeLLM.provider}).</span>}
+                {activeLLM && (
+                  <> Using <strong style={{ color: THEME.ink }}>{activeLLM.name}</strong>{' '}
+                  <span style={{ color: THEME.faint }}>· {activeLLM.provider}</span>.</>
+                )}
               </div>
 
-              {/* Mode toggle */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
                 {[
-                  { key: 'batch', label: '🥘 Batch Prep', desc: 'Optimized for Sunday cook sessions' },
-                  { key: 'quick', label: '⚡ Quick', desc: '30 min or under, any night' },
-                ].map(m => (
-                  <button key={m.key} onClick={() => setMode(m.key)} style={{
-                    flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                    background: mode === m.key ? 'rgba(124,111,247,0.15)' : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${mode === m.key ? 'rgba(124,111,247,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                    color: mode === m.key ? 'var(--accent)' : 'var(--text-dim)',
-                    textAlign: 'left',
-                  }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.label}</div>
-                    <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{m.desc}</div>
-                  </button>
-                ))}
+                  { key: 'batch', label: '🥘 Batch Prep', desc: 'Shared ingredients, Sunday cook sessions' },
+                  { key: 'quick', label: '⚡ Quick',      desc: '30 min or under, any night' },
+                  { key: 'adhd',  label: '✨ ADHD',       desc: 'Maximum novelty — every meal feels new' },
+                ].map(m => {
+                  const active = mode === m.key;
+                  return (
+                    <button key={m.key} onClick={() => setMode(m.key)} style={{
+                      flex: 1, padding: '12px 12px', borderRadius: 14, cursor: 'pointer',
+                      background: active
+                        ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                        : 'oklch(1 0 0 / 0.55)',
+                      backdropFilter: active ? 'none' : 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: active ? 'none' : 'blur(20px) saturate(180%)',
+                      border: 'none',
+                      color: active ? 'white' : THEME.text,
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                      boxShadow: active
+                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.5), 0 6px 14px -6px oklch(0.55 0.16 35 / 0.55)'
+                        : 'inset 0 1px 0 oklch(1 0 0 / 0.7), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>
+                      <div style={{ fontSize: 11, opacity: active ? 0.9 : 0.7, marginTop: 3, lineHeight: 1.35 }}>{m.desc}</div>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
-                {MEAL_TYPES.map(({ key, label, icon }) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontWeight: 500 }}>{icon} {label}</div>
+              <Glass padding={4} style={{ marginBottom: 22 }}>
+                {MEAL_TYPES.map((m, i) => (
+                  <div key={m.key} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderTop: i > 0 ? `1px solid ${THEME.hairline}` : 'none',
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <button className="btn-ghost" style={{ padding: '4px 10px', fontSize: 16 }}
-                        onClick={() => setCounts(c => ({ ...c, [key]: Math.max(0, c[key] - 1) }))}>−</button>
-                      <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 600 }}>{counts[key]}</span>
-                      <button className="btn-ghost" style={{ padding: '4px 10px', fontSize: 16 }}
-                        onClick={() => setCounts(c => ({ ...c, [key]: Math.min(20, c[key] + 1) }))}>+</button>
+                      <Badge tone={m.tone}>{m.label}</Badge>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button style={{ ...glassBtnGhost, padding: '4px 12px', fontSize: 18, lineHeight: 1 }}
+                        onClick={() => setCounts(c => ({ ...c, [m.key]: Math.max(0, c[m.key] - 1) }))}>−</button>
+                      <span style={{
+                        minWidth: 28, textAlign: 'center', fontWeight: 700,
+                        color: THEME.ink, fontVariantNumeric: 'tabular-nums', fontSize: 16,
+                      }}>{counts[m.key]}</span>
+                      <button style={{ ...glassBtnGhost, padding: '4px 12px', fontSize: 18, lineHeight: 1 }}
+                        onClick={() => setCounts(c => ({ ...c, [m.key]: Math.min(20, c[m.key] + 1) }))}>+</button>
                     </div>
                   </div>
                 ))}
+              </Glass>
+
+              <div style={{ fontSize: 13, color: THEME.dim, marginBottom: 22, textAlign: 'center' }}>
+                Total{' '}
+                <strong style={{ color: THEME.ink, fontFamily: display, fontStyle: 'italic', fontSize: 18, fontWeight: 500 }}>{total}</strong>
+                {' '}recipes
+                {total > 0 && <span style={{ color: THEME.faint }}> · ~{Math.ceil(total / 3)}–{Math.ceil(total / 2)} min</span>}
               </div>
 
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>
-                Total: <strong style={{ color: 'var(--text)' }}>{total} recipes</strong>
-                {total > 0 && <span> · takes ~{Math.ceil(total / 3)}–{Math.ceil(total / 2)} min</span>}
-              </div>
-
-              {error && <div style={{ color: 'var(--red)', fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
+              {error && (
+                <Glass tint="oklch(0.55 0.18 25 / 0.18)" padding={12} style={{ marginBottom: 16 }}>
+                  <div style={{ color: THEME.red, fontSize: 13 }}>⚠️ {error}</div>
+                </Glass>
+              )}
 
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-                <button className="btn-primary" style={{ flex: 2 }} onClick={generate} disabled={total === 0}>
-                  Generate {total} Recipes
+                <button style={{ ...glassBtnGhost, flex: 1 }} onClick={onClose}>Cancel</button>
+                <button style={{ ...glassBtnPrimary, flex: 2, opacity: total === 0 ? 0.5 : 1 }} onClick={generate} disabled={total === 0}>
+                  Generate {total} {total === 1 ? 'recipe' : 'recipes'}
                 </button>
               </div>
             </>
           ) : done ? (
             <>
-              <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🎉</div>
-                <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>
-                  {progress?.totalGenerated} recipes generated!
-                </div>
-                <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: '8px 0 22px' }}>
+                <div style={{ fontSize: 38, marginBottom: 10 }}>🎉</div>
+                <div style={{
+                  fontFamily: display, fontSize: 24, fontStyle: 'italic', fontWeight: 500,
+                  color: THEME.ink, marginBottom: 6,
+                }}>{progress?.totalGenerated} recipes ready</div>
+                <div style={{ color: THEME.dim, fontSize: 13 }}>
                   Head to the Recipes tab to browse and add them to your plan.
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                {activeTypes.map(m => (
-                  <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+              <Glass padding={4} style={{ marginBottom: 22 }}>
+                {activeTypes.map((m, i) => (
+                  <div key={m.key} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, fontSize: 14,
+                    padding: '10px 14px',
+                    borderTop: i > 0 ? `1px solid ${THEME.hairline}` : 'none',
+                  }}>
                     <StatusIcon status={progress?.steps[m.key]} />
-                    <span>{m.icon} {m.label}</span>
-                    <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 13 }}>
+                    <Badge tone={m.tone}>{m.label}</Badge>
+                    <span style={{ marginLeft: 'auto', color: THEME.dim, fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                       {progress?.generated[m.key] ?? 0} recipes
                     </span>
                   </div>
                 ))}
-              </div>
-              <button className="btn-primary" style={{ width: '100%' }} onClick={onClose}>Done</button>
+              </Glass>
+              <button style={{ ...glassBtnPrimary, width: '100%' }} onClick={onClose}>Done</button>
             </>
           ) : (
             <>
-              <div style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 20 }}>
-                {activeLLM ? `${activeLLM.name} (${activeLLM.provider}) is working…` : 'Generating…'} This takes a few minutes. Don't close this window.
+              <div style={{ color: THEME.dim, fontSize: 13, marginBottom: 22, lineHeight: 1.5 }}>
+                {activeLLM ? (
+                  <><strong style={{ color: THEME.ink }}>{activeLLM.name}</strong> <span style={{ color: THEME.faint }}>· {activeLLM.provider}</span> is working…</>
+                ) : 'Generating…'} This takes a few minutes. Don't close this window.
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
                 {activeTypes.map(m => {
                   const status = progress?.steps[m.key] || 'pending';
                   const generated = progress?.generated[m.key];
+                  const tint =
+                    status === 'generating' ? 'oklch(0.62 0.14 35 / 0.14)' :
+                    status === 'done'       ? 'oklch(0.55 0.10 145 / 0.14)' :
+                    status === 'error'      ? 'oklch(0.55 0.18 25 / 0.14)' : null;
                   return (
-                    <div key={m.key} style={{
+                    <Glass key={m.key} tint={tint} padding={12} style={{
                       display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 14px',
-                      background: status === 'generating' ? 'rgba(124,111,247,0.08)' : status === 'done' ? 'rgba(74,222,128,0.06)' : 'var(--surface2)',
-                      border: `1px solid ${status === 'generating' ? 'rgba(124,111,247,0.3)' : status === 'done' ? 'rgba(74,222,128,0.2)' : 'var(--border)'}`,
-                      borderRadius: 8,
-                      transition: 'background 0.3s, border-color 0.3s',
+                      transition: 'background 0.3s',
                     }}>
                       <StatusIcon status={status} />
-                      <span style={{ fontWeight: 500 }}>{m.icon} {m.label}</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)' }}>
+                      <Badge tone={m.tone}>{m.label}</Badge>
+                      <span style={{ marginLeft: 'auto', fontSize: 13, color: THEME.dim, fontVariantNumeric: 'tabular-nums' }}>
                         {status === 'generating' && 'Generating…'}
-                        {status === 'done' && `${generated} recipes ✓`}
-                        {status === 'error' && <span style={{ color: 'var(--red)' }}>Failed</span>}
+                        {status === 'done'  && <span style={{ color: THEME.sage, fontWeight: 600 }}>{generated} ready ✓</span>}
+                        {status === 'error' && <span style={{ color: THEME.red }}>Failed</span>}
                         {status === 'pending' && `${counts[m.key]} requested`}
                       </span>
-                    </div>
+                    </Glass>
                   );
                 })}
               </div>
 
               {progress && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: THEME.dim, marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 700 }}>
                     <span>Progress</span>
-                    <span>{Object.values(progress.steps).filter(s => s === 'done' || s === 'error').length} of {activeTypes.length} batches</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                      {Object.values(progress.steps).filter(s => s === 'done' || s === 'error').length} / {activeTypes.length}
+                    </span>
                   </div>
-                  <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: 6, background: 'oklch(0.4 0.02 60 / 0.10)', borderRadius: 999, overflow: 'hidden' }}>
                     <div style={{
-                      height: '100%', borderRadius: 3, background: 'var(--accent)', transition: 'width 0.4s',
+                      height: '100%', borderRadius: 999,
+                      background: `linear-gradient(90deg, ${THEME.accentSoft}, ${THEME.accent})`,
+                      transition: 'width 0.4s',
                       width: `${(Object.values(progress.steps).filter(s => s === 'done' || s === 'error').length / activeTypes.length) * 100}%`,
                     }} />
                   </div>
                 </div>
               )}
 
-              {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>⚠️ {error}</div>}
+              {error && <div style={{ color: THEME.red, fontSize: 13 }}>⚠️ {error}</div>}
             </>
           )}
         </div>

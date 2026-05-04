@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { linkifyTechniques } from '../lib/techniques.js';
+import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost, ambientBG } from '../lib/glass.jsx';
 
 function parseTimerSeconds(text) {
   const match = text.match(/(\d+)[\s-]*(to[\s-]*\d+\s*)?(minute|min|second|sec)/i);
@@ -30,29 +31,40 @@ function Timer({ seconds, onDone }) {
   const done = remaining === 0;
 
   return (
-    <div style={{ marginTop: 16, padding: '14px 18px', background: 'var(--surface2)', borderRadius: 10,
-                  border: `1px solid ${done ? 'var(--green)' : running ? 'var(--accent)' : 'var(--border)'}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontWeight: 700, fontSize: 28, fontVariantNumeric: 'tabular-nums',
-                      color: done ? 'var(--green)' : 'var(--text)' }}>
-          {done ? '✓ Done!' : `${mins}:${String(secs).padStart(2, '0')}`}
+    <Glass
+      tint={done ? 'oklch(0.55 0.10 145 / 0.18)' : running ? 'oklch(0.62 0.14 35 / 0.14)' : null}
+      padding={18}
+      style={{ marginTop: 18 }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{
+          fontFamily: display, fontSize: 36, fontWeight: 500, fontStyle: 'italic',
+          fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+          color: done ? THEME.sage : THEME.ink,
+        }}>
+          {done ? '✓ Done' : `${mins}:${String(secs).padStart(2, '0')}`}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {!done && (
-            <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }}
+            <button style={{ ...glassBtnGhost, fontSize: 13, padding: '7px 16px' }}
               onClick={() => setRunning(r => !r)}>
-              {running ? '⏸ Pause' : running === false && remaining < seconds ? '▶ Resume' : '▶ Start'}
+              {running ? '⏸ Pause' : remaining < seconds ? '▶ Resume' : '▶ Start'}
             </button>
           )}
-          <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }}
+          <button style={{ ...glassBtnGhost, fontSize: 13, padding: '7px 16px' }}
             onClick={() => { setRemaining(seconds); setRunning(false); }}>↺ Reset</button>
         </div>
       </div>
-      <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', borderRadius: 2, background: done ? 'var(--green)' : 'var(--accent)',
-                      width: `${pct}%`, transition: 'width 1s linear' }} />
+      <div style={{ height: 6, background: 'oklch(0.4 0.02 60 / 0.10)', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', borderRadius: 999,
+          background: done
+            ? `linear-gradient(90deg, ${THEME.sagePastel}, ${THEME.sage})`
+            : `linear-gradient(90deg, ${THEME.accentSoft}, ${THEME.accent})`,
+          width: `${pct}%`, transition: 'width 1s linear',
+        }} />
       </div>
-    </div>
+    </Glass>
   );
 }
 
@@ -61,7 +73,7 @@ async function markCooked(recipeId) {
 }
 
 export default function CookMode({ recipe, onClose }) {
-  const [phase, setPhase] = useState('mise'); // 'mise' | 'cook'
+  const [phase, setPhase] = useState('mise');
   const [step, setStep] = useState(0);
   const [checkedIngredients, setCheckedIngredients] = useState(new Set());
   const [doneSteps, setDoneSteps] = useState(new Set());
@@ -73,7 +85,6 @@ export default function CookMode({ recipe, onClose }) {
   const currentStep = steps[step] || '';
   const timerSeconds = parseTimerSeconds(currentStep);
 
-  // Request screen wake lock so phone doesn't sleep while cooking
   useEffect(() => {
     if ('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').then(lock => { wakeLockRef.current = lock; }).catch(() => {});
@@ -81,7 +92,6 @@ export default function CookMode({ recipe, onClose }) {
     return () => { wakeLockRef.current?.release(); };
   }, []);
 
-  // Keyboard navigation
   useEffect(() => {
     function onKey(e) {
       if (phase !== 'cook') return;
@@ -103,98 +113,151 @@ export default function CookMode({ recipe, onClose }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 300,
+      position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: ambientBG,
     }}>
-      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px',
-        borderBottom: '1px solid var(--border)', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px',
+        flexShrink: 0,
+        background: 'oklch(1 0 0 / 0.55)',
+        backdropFilter: 'blur(28px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+        boxShadow: '0 1px 0 oklch(0.4 0.02 60 / 0.12)',
       }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)',
-                                           fontSize: 22, cursor: 'pointer', padding: 0, lineHeight: 1 }}>←</button>
+        <button onClick={onClose} style={{
+          background: 'transparent', border: 'none', color: THEME.dim,
+          fontSize: 24, cursor: 'pointer', padding: 0, lineHeight: 1,
+        }}>←</button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{
+            fontFamily: display, fontSize: 18, fontWeight: 500, fontStyle: 'italic',
+            color: THEME.ink, lineHeight: 1.2,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
             {recipe.name}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 11, color: THEME.dim, letterSpacing: '0.04em', marginTop: 2 }}>
             {recipe.prep_time_min}m prep · {recipe.cook_time_min}m cook · {recipe.cuisine}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--surface2)', borderRadius: 20, padding: '4px 8px' }}>
-          {['mise', 'cook'].map(p => (
-            <button key={p} onClick={() => { setPhase(p); if (p === 'cook') setStep(0); }}
-              style={{ background: phase === p ? 'var(--accent)' : 'transparent', color: phase === p ? 'white' : 'var(--text-dim)',
-                       border: 'none', borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              {p === 'mise' ? 'Ingredients' : 'Steps'}
-            </button>
-          ))}
+        <div style={{
+          display: 'flex', gap: 2,
+          background: 'oklch(1 0 0 / 0.5)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 999, padding: 3,
+          boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
+        }}>
+          {[
+            { key: 'mise', label: 'Ingredients' },
+            { key: 'cook', label: 'Steps' },
+          ].map(p => {
+            const active = phase === p.key;
+            return (
+              <button key={p.key} onClick={() => { setPhase(p.key); if (p.key === 'cook') setStep(0); }}
+                style={{
+                  background: active
+                    ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                    : 'transparent',
+                  color: active ? 'white' : THEME.dim,
+                  border: 'none', borderRadius: 999, padding: '5px 14px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {p.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px 20px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px 20px', maxWidth: 760, width: '100%', alignSelf: 'center' }}>
 
         {phase === 'mise' ? (
           <>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>
+            <div style={{
+              fontSize: 11, color: THEME.accent, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 14,
+            }}>Mise en place</div>
+            <div style={{ fontSize: 14, color: THEME.text, marginBottom: 22, lineHeight: 1.5 }}>
               Check off everything before you start cooking.
             </div>
-            {ingredients.map((ing, i) => (
-              <div key={i} onClick={() => toggleIngredient(i)} style={{
-                display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0',
-                borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                opacity: checkedIngredients.has(i) ? 0.45 : 1,
-              }}>
-                <div style={{
-                  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                  background: checkedIngredients.has(i) ? 'var(--accent)' : 'var(--surface2)',
-                  border: `2px solid ${checkedIngredients.has(i) ? 'var(--accent)' : 'var(--border)'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'white',
-                }}>
-                  {checkedIngredients.has(i) ? '✓' : ''}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 600, fontSize: 16 }}>{ing.name}</span>
-                </div>
-                <div style={{ fontSize: 15, color: 'var(--text-dim)', textAlign: 'right' }}>
-                  {ing.quantity} {ing.unit}
-                </div>
-              </div>
-            ))}
+            <Glass padding={4}>
+              {ingredients.map((ing, i) => {
+                const checked = checkedIngredients.has(i);
+                return (
+                  <div key={i} onClick={() => toggleIngredient(i)} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+                    borderTop: i > 0 ? `1px solid ${THEME.hairline}` : 'none',
+                    cursor: 'pointer',
+                    opacity: checked ? 0.45 : 1,
+                    transition: 'opacity 200ms ease',
+                  }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                      background: checked
+                        ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                        : 'oklch(1 0 0 / 0.55)',
+                      boxShadow: checked
+                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.4)'
+                        : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, color: 'white', fontWeight: 700,
+                    }}>{checked ? '✓' : ''}</div>
+                    <div style={{ flex: 1, fontWeight: 600, fontSize: 16, color: THEME.ink }}>{ing.name}</div>
+                    <div style={{
+                      fontSize: 14, color: THEME.dim, textAlign: 'right',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      {ing.quantity} {ing.unit}
+                    </div>
+                  </div>
+                );
+              })}
+            </Glass>
 
             {recipe.toddler_notes && (
-              <div style={{ marginTop: 24, padding: 16, background: 'rgba(74,222,128,0.06)',
-                            border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10 }}>
-                <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>👶 Toddler prep</div>
-                <div style={{ fontSize: 14, lineHeight: 1.6 }}>{recipe.toddler_notes}</div>
-              </div>
+              <Glass tint="oklch(0.55 0.10 145 / 0.18)" padding={18} style={{ marginTop: 22 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: THEME.ink, letterSpacing: '0.04em' }}>
+                  👶 Toddler prep
+                </div>
+                <div style={{ fontSize: 14, lineHeight: 1.6, color: THEME.text }}>{recipe.toddler_notes}</div>
+              </Glass>
             )}
 
-            <button className="btn-primary" style={{ width: '100%', marginTop: 24, fontSize: 16, padding: '14px' }}
+            <button style={{ ...glassBtnPrimary, width: '100%', marginTop: 24, fontSize: 16, padding: '14px' }}
               onClick={() => setPhase('cook')}>
-              Start Cooking →
+              Start cooking →
             </button>
           </>
         ) : (
           <>
-            {/* Progress */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 24, flexWrap: 'wrap' }}>
-              {steps.map((_, i) => (
-                <div key={i} onClick={() => setStep(i)} style={{
-                  flex: 1, minWidth: 20, height: 4, borderRadius: 2, cursor: 'pointer',
-                  background: doneSteps.has(i) ? 'var(--green)' : i === step ? 'var(--accent)' : 'var(--surface2)',
-                  transition: 'background 0.2s',
-                }} />
-              ))}
+              {steps.map((_, i) => {
+                const isDone = doneSteps.has(i);
+                const isCurrent = i === step;
+                return (
+                  <div key={i} onClick={() => setStep(i)} style={{
+                    flex: 1, minWidth: 20, height: 4, borderRadius: 999, cursor: 'pointer',
+                    background: isDone
+                      ? THEME.sage
+                      : isCurrent
+                        ? THEME.accent
+                        : 'oklch(0.4 0.02 60 / 0.18)',
+                    transition: 'background 0.2s',
+                  }} />
+                );
+              })}
             </div>
 
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-              Step {step + 1} of {totalSteps}
-            </div>
+            <div style={{
+              fontSize: 11, color: THEME.accent, fontWeight: 700,
+              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,
+            }}>Step {step + 1} of {totalSteps}</div>
 
-            {/* Current step */}
-            <div style={{ fontSize: 22, lineHeight: 1.55, fontWeight: 500, marginBottom: 8 }}>
+            <div style={{
+              fontFamily: display, fontSize: 26, lineHeight: 1.4, fontWeight: 400, fontStyle: 'italic',
+              marginBottom: 8, color: THEME.ink, letterSpacing: '-0.005em',
+            }}>
               {linkifyTechniques(currentStep).map((part, j) => (
                 typeof part === 'string'
                   ? <span key={j}>{part}</span>
@@ -205,55 +268,67 @@ export default function CookMode({ recipe, onClose }) {
                       target="_blank"
                       rel="noreferrer"
                       title={`Watch a tutorial: ${part.term}`}
-                      style={{ color: 'var(--accent)', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 4 }}
+                      style={{
+                        color: THEME.accent, textDecoration: 'underline',
+                        textDecorationStyle: 'dotted', textUnderlineOffset: 5,
+                      }}
                     >{part.term}<span style={{ fontSize: 14, marginLeft: 3, opacity: 0.7 }}>▶</span></a>
                   )
               ))}
             </div>
 
-            {/* Timer if step has a time */}
             {timerSeconds && <Timer key={`${step}-${timerSeconds}`} seconds={timerSeconds} />}
 
-            {/* Upcoming step preview */}
             {step < totalSteps - 1 && (
-              <div style={{ marginTop: 24, padding: 14, background: 'var(--surface)', borderRadius: 8,
-                            border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600,
-                              textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next</div>
-                <div style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+              <Glass padding={16} style={{ marginTop: 24 }}>
+                <div style={{
+                  fontSize: 10, color: THEME.dim, marginBottom: 6, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.1em',
+                }}>Next</div>
+                <div style={{ fontSize: 14, color: THEME.text, lineHeight: 1.55 }}>
                   {steps[step + 1]}
                 </div>
-              </div>
+              </Glass>
             )}
 
             {step === totalSteps - 1 && doneSteps.has(step) && (
-              <div style={{ marginTop: 24, textAlign: 'center', padding: 24, background: 'rgba(74,222,128,0.07)',
-                            borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)' }}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>Enjoy your meal!</div>
-              </div>
+              <Glass tint="oklch(0.55 0.10 145 / 0.22)" padding={28} style={{ marginTop: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 44, marginBottom: 10 }}>🎉</div>
+                <div style={{
+                  fontFamily: display, fontWeight: 500, fontStyle: 'italic',
+                  fontSize: 24, color: THEME.ink,
+                }}>Enjoy your meal</div>
+              </Glass>
             )}
           </>
         )}
       </div>
 
-      {/* Footer nav (cook phase only) */}
       {phase === 'cook' && (
         <div style={{
-          display: 'flex', gap: 12, padding: '16px 20px',
-          borderTop: '1px solid var(--border)', flexShrink: 0,
-          paddingBottom: `calc(16px + env(safe-area-inset-bottom))`,
+          display: 'flex', gap: 12, padding: '14px 20px',
+          flexShrink: 0,
+          paddingBottom: `calc(14px + env(safe-area-inset-bottom))`,
+          background: 'oklch(1 0 0 / 0.55)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          boxShadow: '0 -1px 0 oklch(0.4 0.02 60 / 0.12)',
         }}>
-          <button className="btn-ghost" style={{ flex: 1, fontSize: 16 }}
+          <button style={{ ...glassBtnGhost, flex: 1, fontSize: 16, padding: '12px', opacity: step === 0 ? 0.5 : 1 }}
             onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}>
             ← Back
           </button>
           {step < totalSteps - 1 ? (
-            <button className="btn-primary" style={{ flex: 2, fontSize: 16 }} onClick={markDone}>
+            <button style={{ ...glassBtnPrimary, flex: 2, fontSize: 16, padding: '12px' }} onClick={markDone}>
               Done → Next
             </button>
           ) : (
-            <button className="btn-primary" style={{ flex: 2, fontSize: 16, background: 'var(--green)' }}
+            <button
+              style={{
+                ...glassBtnPrimary, flex: 2, fontSize: 16, padding: '12px',
+                background: `linear-gradient(180deg, color-mix(in oklch, ${THEME.sage} 75%, white 25%), ${THEME.sage})`,
+                boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 145 / 0.5), 0 6px 14px -6px oklch(0.55 0.10 145 / 0.55)',
+              }}
               onClick={() => { setDoneSteps(s => new Set([...s, step])); markCooked(recipe.id); }}>
               ✓ Finish
             </button>

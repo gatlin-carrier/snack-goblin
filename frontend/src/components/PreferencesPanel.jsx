@@ -1,8 +1,41 @@
 import { useState, useEffect } from 'react';
+import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
-const PREF_LABELS = { liked: { label: '❤️ Liked', color: 'var(--green)' }, disliked: { label: '👎 Disliked', color: 'var(--yellow)' }, excluded: { label: '🚫 Excluded', color: 'var(--red)' } };
+const PREF_LABELS = {
+  liked:    { label: '❤ Liked',     tone: 'sage',   color: THEME.sage },
+  disliked: { label: '👎 Disliked', tone: 'yellow', color: 'oklch(0.55 0.13 80)' },
+  excluded: { label: '🚫 Excluded', tone: 'rust',   color: THEME.red },
+};
 
 const COMMON_CUISINES = ['Italian', 'Mexican', 'Asian', 'Mediterranean', 'American', 'Indian', 'Thai', 'Japanese', 'Chinese', 'Greek', 'Middle Eastern', 'Korean', 'French', 'Spanish'];
+
+function SectionTitle({ children }) {
+  return (
+    <div style={{
+      fontSize: 11, fontWeight: 700, color: THEME.accent,
+      letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,
+    }}>{children}</div>
+  );
+}
+
+function PrefChip({ name, color, onRemove }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      background: 'oklch(1 0 0 / 0.55)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 500,
+      color: THEME.ink,
+      boxShadow: `inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px ${color} `,
+    }}>
+      {name}
+      <button onClick={onRemove} style={{
+        background: 'none', border: 'none', color: THEME.dim,
+        cursor: 'pointer', padding: 0, fontSize: 16, lineHeight: 1,
+      }}>×</button>
+    </span>
+  );
+}
 
 export default function PreferencesPanel({ onClose }) {
   const [prefs, setPrefs] = useState({ cuisines: { liked: [], disliked: [], excluded: [] }, ingredients: { liked: [], disliked: [], excluded: [] } });
@@ -41,63 +74,65 @@ export default function PreferencesPanel({ onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{ fontSize: 18, fontWeight: 700 }}>⚙️ Preferences</div>
+          <div style={{
+            fontFamily: display, fontSize: 22, fontStyle: 'italic',
+            fontWeight: 500, color: THEME.ink,
+          }}>⚙ Preferences</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
 
-          {/* Cuisines */}
-          <div style={{ marginBottom: 28 }}>
-            <div className="section-title">Cuisines</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+          <div style={{ marginBottom: 30 }}>
+            <SectionTitle>Cuisines</SectionTitle>
+            <div style={{ fontSize: 13, color: THEME.text, marginBottom: 14, lineHeight: 1.5 }}>
               Liked cuisines are prioritized in generation. Excluded cuisines are never generated.
             </div>
 
-            {/* Current cuisine prefs */}
             {['liked', 'disliked', 'excluded'].map(pref => {
               const items = prefs.cuisines[pref] || [];
               if (!items.length) return null;
               return (
-                <div key={pref} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: PREF_LABELS[pref].color, marginBottom: 6 }}>{PREF_LABELS[pref].label}</div>
+                <div key={pref} style={{ marginBottom: 12 }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: PREF_LABELS[pref].color,
+                    marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  }}>{PREF_LABELS[pref].label}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {items.map(name => (
-                      <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 10px', fontSize: 13 }}>
-                        {name}
-                        <button onClick={() => remove('cuisine', name)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
-                      </span>
+                      <PrefChip key={name} name={name} color={PREF_LABELS[pref].color} onRemove={() => remove('cuisine', name)} />
                     ))}
                   </div>
                 </div>
               );
             })}
 
-            {/* Quick add from common */}
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Quick add:</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            <div style={{ marginTop: 14 }}>
+              <div style={{
+                fontSize: 11, color: THEME.dim, marginBottom: 8, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+              }}>Quick add</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                 {COMMON_CUISINES.filter(c => !allCuisines.includes(c)).map(c => (
-                  <button key={c} className="btn-ghost" style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20 }} onClick={() => addCuisine(c, newCuisinePref)}>{c}</button>
+                  <button key={c} style={{ ...glassBtnGhost, fontSize: 12, padding: '4px 12px' }} onClick={() => addCuisine(c, newCuisinePref)}>{c}</button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input value={newCuisine} onChange={e => setNewCuisine(e.target.value)} placeholder="Custom cuisine…" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && addCuisine(newCuisine, newCuisinePref)} />
-                <select value={newCuisinePref} onChange={e => setNewCuisinePref(e.target.value)} style={{ width: 110 }}>
-                  <option value="liked">❤️ Liked</option>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input value={newCuisine} onChange={e => setNewCuisine(e.target.value)} placeholder="Custom cuisine…" style={{ flex: 1, minWidth: 160 }} onKeyDown={e => e.key === 'Enter' && addCuisine(newCuisine, newCuisinePref)} />
+                <select value={newCuisinePref} onChange={e => setNewCuisinePref(e.target.value)} style={{ width: 130 }}>
+                  <option value="liked">❤ Liked</option>
                   <option value="disliked">👎 Disliked</option>
                   <option value="excluded">🚫 Excluded</option>
                 </select>
-                <button className="btn-primary" style={{ fontSize: 13 }} onClick={() => addCuisine(newCuisine, newCuisinePref)}>Add</button>
+                <button style={{ ...glassBtnPrimary, fontSize: 13 }} onClick={() => addCuisine(newCuisine, newCuisinePref)}>Add</button>
               </div>
             </div>
           </div>
 
-          {/* Ingredients */}
           <div>
-            <div className="section-title">Ingredients</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+            <SectionTitle>Ingredients</SectionTitle>
+            <div style={{ fontSize: 13, color: THEME.text, marginBottom: 14, lineHeight: 1.5 }}>
               Excluded ingredients are filtered from all results and never generated. Disliked are minimized.
             </div>
 
@@ -105,32 +140,36 @@ export default function PreferencesPanel({ onClose }) {
               const items = prefs.ingredients[pref] || [];
               if (!items.length) return null;
               return (
-                <div key={pref} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: PREF_LABELS[pref].color, marginBottom: 6 }}>{PREF_LABELS[pref].label}</div>
+                <div key={pref} style={{ marginBottom: 12 }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: PREF_LABELS[pref].color,
+                    marginBottom: 8, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  }}>{PREF_LABELS[pref].label}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {items.map(name => (
-                      <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 10px', fontSize: 13 }}>
-                        {name}
-                        <button onClick={() => remove('ingredient', name)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
-                      </span>
+                      <PrefChip key={name} name={name} color={PREF_LABELS[pref].color} onRemove={() => remove('ingredient', name)} />
                     ))}
                   </div>
                 </div>
               );
             })}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <input value={newIngredient} onChange={e => setNewIngredient(e.target.value)} placeholder="e.g. cilantro, mushrooms…" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && addIngredient()} />
-              <select value={newIngPref} onChange={e => setNewIngPref(e.target.value)} style={{ width: 110 }}>
-                <option value="liked">❤️ Liked</option>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+              <input value={newIngredient} onChange={e => setNewIngredient(e.target.value)} placeholder="e.g. cilantro, mushrooms…" style={{ flex: 1, minWidth: 160 }} onKeyDown={e => e.key === 'Enter' && addIngredient()} />
+              <select value={newIngPref} onChange={e => setNewIngPref(e.target.value)} style={{ width: 130 }}>
+                <option value="liked">❤ Liked</option>
                 <option value="disliked">👎 Disliked</option>
                 <option value="excluded">🚫 Excluded</option>
               </select>
-              <button className="btn-primary" style={{ fontSize: 13 }} onClick={addIngredient}>Add</button>
+              <button style={{ ...glassBtnPrimary, fontSize: 13 }} onClick={addIngredient}>Add</button>
             </div>
           </div>
 
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)', fontSize: 13, color: 'var(--text-dim)' }}>
+          <div style={{
+            marginTop: 26, paddingTop: 18,
+            borderTop: `1px solid ${THEME.hairline}`,
+            fontSize: 12, color: THEME.dim, lineHeight: 1.55,
+          }}>
             Preferences are applied to new recipe generation and recommendations. Re-generate to see the effect on your recipe pool.
           </div>
         </div>

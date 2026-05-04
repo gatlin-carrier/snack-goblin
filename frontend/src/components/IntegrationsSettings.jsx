@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 export default function IntegrationsSettings({ onClose, showToast }) {
   const [pexelsKey, setPexelsKey] = useState('');
@@ -11,7 +12,6 @@ export default function IntegrationsSettings({ onClose, showToast }) {
 
   useEffect(() => { load(); }, []);
 
-  // Poll backfill status every 3s while in progress
   useEffect(() => {
     if (!backfillStatus.in_progress) return;
     const id = setInterval(async () => {
@@ -25,7 +25,6 @@ export default function IntegrationsSettings({ onClose, showToast }) {
     return () => clearInterval(id);
   }, [backfillStatus.in_progress]);
 
-  // Poll price refresh status
   useEffect(() => {
     if (!priceStatus.in_progress) return;
     const id = setInterval(async () => {
@@ -98,30 +97,32 @@ export default function IntegrationsSettings({ onClose, showToast }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{ fontSize: 18, fontWeight: 700 }}>🔌 Integrations</div>
+          <div style={{
+            fontFamily: display, fontSize: 22, fontStyle: 'italic',
+            fontWeight: 500, color: THEME.ink,
+          }}>🔌 Integrations</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
 
-          {/* Pexels */}
-          <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>📸 Pexels</div>
+          <Glass padding={18} style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: THEME.ink }}>📸 Pexels</div>
               {pexelsConfigured ? (
-                <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>● Connected</span>
+                <span style={{ fontSize: 11, color: THEME.sage, fontWeight: 700, letterSpacing: '0.06em' }}>● Connected</span>
               ) : (
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>○ Not configured</span>
+                <span style={{ fontSize: 11, color: THEME.faint, letterSpacing: '0.06em' }}>○ Not configured</span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: THEME.text, lineHeight: 1.55, marginBottom: 14 }}>
               Free food photography for recipe cards. Get a free API key at{' '}
-              <a href="https://www.pexels.com/api/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>pexels.com/api</a>
+              <a href="https://www.pexels.com/api/" target="_blank" rel="noreferrer" style={{ color: THEME.accent, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>pexels.com/api</a>
               {' '}— 200 requests/hour, plenty for personal use.
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <input
                 type="password"
                 value={pexelsKey}
@@ -130,58 +131,54 @@ export default function IntegrationsSettings({ onClose, showToast }) {
                 style={{ flex: 1, fontSize: 13 }}
               />
               <button
-                className="btn-primary"
+                style={{ ...glassBtnPrimary, fontSize: 13, padding: '8px 16px', opacity: (!pexelsKey.trim() || saving) ? 0.5 : 1 }}
                 onClick={savePexelsKey}
                 disabled={!pexelsKey.trim() || saving}
-                style={{ fontSize: 13, padding: '8px 14px' }}
               >
                 {saving ? '…' : 'Save'}
               </button>
             </div>
 
             {pexelsConfigured && (
-              <div style={{ paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.hairline}` }}>
+                <div style={{ fontSize: 12, color: THEME.dim, marginBottom: 10 }}>
                   {backfillStatus.remaining > 0
-                    ? `${backfillStatus.remaining} recipe${backfillStatus.remaining !== 1 ? 's' : ''} without images`
+                    ? <><span style={{ color: THEME.ink, fontWeight: 700 }}>{backfillStatus.remaining}</span> recipe{backfillStatus.remaining !== 1 ? 's' : ''} without images</>
                     : 'All recipes have images'}
                 </div>
                 {backfillStatus.remaining > 0 && (
                   <button
-                    className="btn-ghost"
+                    style={{ ...glassBtnGhost, fontSize: 12, padding: '6px 14px', opacity: (backfilling || backfillStatus.in_progress) ? 0.5 : 1 }}
                     onClick={startBackfill}
                     disabled={backfilling || backfillStatus.in_progress}
-                    style={{ fontSize: 12, padding: '6px 12px' }}
                   >
                     {backfilling || backfillStatus.in_progress ? '⏳ Fetching…' : '✨ Fetch images now'}
                   </button>
                 )}
               </div>
             )}
-          </div>
+          </Glass>
 
-          {/* Price refresh via Claude web search */}
-          <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>💰 Recipe pricing</div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 12 }}>
+          <Glass padding={18} style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: THEME.ink, marginBottom: 8 }}>💰 Recipe pricing</div>
+            <div style={{ fontSize: 12, color: THEME.text, lineHeight: 1.55, marginBottom: 14 }}>
               Estimates per-serving cost using Claude with live web search. Use this when recipes were generated by a local model (which can't search current prices) or to refresh stale estimates.
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: THEME.dim, marginBottom: 10 }}>
               {priceStatus.remaining > 0
-                ? `${priceStatus.remaining} recipe${priceStatus.remaining !== 1 ? 's' : ''} without prices`
+                ? <><span style={{ color: THEME.ink, fontWeight: 700 }}>{priceStatus.remaining}</span> recipe{priceStatus.remaining !== 1 ? 's' : ''} without prices</>
                 : 'All recipes have prices'}
             </div>
             <button
-              className="btn-ghost"
+              style={{ ...glassBtnGhost, fontSize: 12, padding: '6px 14px', opacity: (refreshingPrices || priceStatus.in_progress || priceStatus.remaining === 0) ? 0.5 : 1 }}
               onClick={refreshPrices}
               disabled={refreshingPrices || priceStatus.in_progress || priceStatus.remaining === 0}
-              style={{ fontSize: 12, padding: '6px 12px' }}
             >
               {refreshingPrices || priceStatus.in_progress ? '⏳ Pricing…' : '✨ Fetch prices now'}
             </button>
-          </div>
+          </Glass>
 
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: THEME.faint, lineHeight: 1.55 }}>
             Photos are fetched once per recipe and cached. Photographer attribution is preserved per Pexels guidelines.
             Prices use current 2026 US grocery data via web search.
           </div>

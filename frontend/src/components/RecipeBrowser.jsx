@@ -4,20 +4,21 @@ import RecipeModal from './RecipeModal.jsx';
 import GeneratePanel from './GeneratePanel.jsx';
 import PreferencesPanel from './PreferencesPanel.jsx';
 import ImportURLPanel from './ImportURLPanel.jsx';
+import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const MEAL_TYPES = [
-  { key: '', label: 'All' },
-  { key: 'breakfast', label: '🌅 Breakfast' },
-  { key: 'lunch', label: '☀️ Lunch' },
-  { key: 'dinner', label: '🌙 Dinner' },
-  { key: 'snack', label: '🍎 Snacks' },
+  { key: '',          label: 'All' },
+  { key: 'breakfast', label: 'Breakfast' },
+  { key: 'lunch',     label: 'Lunch' },
+  { key: 'dinner',    label: 'Dinner' },
+  { key: 'snack',     label: 'Snacks' },
 ];
 
 const SORT_OPTIONS = [
-  { key: 'created_at', label: 'Newest' },
+  { key: 'created_at',  label: 'Newest' },
   { key: 'recommended', label: '⭐ Recommended' },
-  { key: 'rating', label: 'Top Rated' },
-  { key: 'cost', label: '💰 Cheapest' },
+  { key: 'rating',      label: 'Top Rated' },
+  { key: 'cost',        label: '💰 Cheapest' },
 ];
 
 export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
@@ -35,7 +36,7 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
   useEffect(() => {
     loadRecipes();
     if (currentPlan?.items) setPlanItemCount(currentPlan.items.length);
-  }, [filter]);
+  }, [filter, activeCollection]);
 
   useEffect(() => {
     fetch('/api/collections').then(r => r.json()).then(setCollections).catch(() => {});
@@ -93,32 +94,55 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
     showToast('Recipe deleted');
   }
 
-  const cuisines = [...new Set(recipes.map(r => r.cuisine).filter(Boolean))].sort();
   const allTags = [...new Set(recipes.flatMap(r => r.tags || []))].sort();
-  const displayed = recipes
-    .filter(r => !activeTag || (r.tags || []).includes(activeTag))
-    .filter(r => !activeCollection || true); // collection filtering done server-side via loadRecipes
+  const displayed = recipes.filter(r => !activeTag || (r.tags || []).includes(activeTag));
 
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Recipes</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn-ghost" onClick={() => setShowPrefs(true)}>⚙️ Preferences</button>
-          <button className="btn-ghost" onClick={() => setShowImport(true)}>🔗 Import URL</button>
-          <button className="btn-primary" onClick={() => setShowGenerate(true)}>✨ Generate</button>
+        <div>
+          <div style={{
+            fontSize: 11, color: THEME.accent, fontWeight: 700,
+            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+          }}>Library</div>
+          <div style={{
+            fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+          }}>Recipes</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={glassBtnGhost} onClick={() => setShowPrefs(true)}>⚙ Preferences</button>
+          <button style={glassBtnGhost} onClick={() => setShowImport(true)}>🔗 Import URL</button>
+          <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ Generate</button>
         </div>
       </div>
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Meal type tabs */}
-        <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 4 }}>
-          {MEAL_TYPES.map(mt => (
-            <button key={mt.key} onClick={() => { setFilter(f => ({ ...f, meal_type: mt.key })); setActiveCollection(null); }}
-              style={{ background: filter.meal_type === mt.key && !activeCollection ? 'var(--accent)' : 'transparent', color: filter.meal_type === mt.key && !activeCollection ? 'white' : 'var(--text-dim)', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-            >{mt.label}</button>
-          ))}
+        <div style={{
+          display: 'flex', gap: 2,
+          background: 'oklch(1 0 0 / 0.45)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 999, padding: 3,
+          boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
+        }}>
+          {MEAL_TYPES.map(mt => {
+            const active = filter.meal_type === mt.key && !activeCollection;
+            return (
+              <button key={mt.key} onClick={() => { setFilter(f => ({ ...f, meal_type: mt.key })); setActiveCollection(null); }}
+                style={{
+                  background: active
+                    ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                    : 'transparent',
+                  color: active ? 'white' : THEME.dim,
+                  border: 'none', borderRadius: 999,
+                  padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  boxShadow: active ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+                  transition: 'background 160ms ease',
+                }}
+              >{mt.label}</button>
+            );
+          })}
         </div>
 
         {!activeCollection && (
@@ -134,7 +158,6 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
           </>
         )}
 
-        {/* Collection filter */}
         {collections.length > 0 && (
           <select value={activeCollection?.id || ''} onChange={e => {
             const col = collections.find(c => c.id === Number(e.target.value));
@@ -146,36 +169,55 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
           </select>
         )}
 
-        <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)' }}>
-          {displayed.length} recipe{displayed.length !== 1 ? 's' : ''}
+        <div style={{
+          marginLeft: 'auto', fontSize: 11, color: THEME.dim,
+          letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700,
+        }}>
+          <span style={{
+            color: THEME.ink, fontFamily: display, fontStyle: 'italic',
+            fontWeight: 500, fontSize: 18, letterSpacing: 0, textTransform: 'none', marginRight: 6,
+          }}>{displayed.length}</span>
+          {displayed.length !== 1 ? 'recipes' : 'recipe'}
         </div>
       </div>
 
-      {/* Tag chips */}
       {allTags.length > 0 && !activeCollection && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
-          {allTags.map(tag => (
-            <button key={tag} onClick={() => setActiveTag(t => t === tag ? '' : tag)} style={{
-              background: activeTag === tag ? 'rgba(124,111,247,0.2)' : 'var(--surface2)',
-              border: `1px solid ${activeTag === tag ? 'var(--accent)' : 'var(--border)'}`,
-              color: activeTag === tag ? 'var(--accent)' : 'var(--text-dim)',
-              borderRadius: 20, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
-            }}>{tag}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 22 }}>
+          {allTags.map(tag => {
+            const active = activeTag === tag;
+            return (
+              <button key={tag} onClick={() => setActiveTag(t => t === tag ? '' : tag)} style={{
+                background: active ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                border: 'none',
+                color: active ? THEME.accent : THEME.text,
+                borderRadius: 999, padding: '4px 12px',
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: active
+                  ? 'inset 0 1px 0 oklch(1 0 0 / 0.85), 0 0 0 0.5px oklch(0.62 0.14 35 / 0.5)'
+                  : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12)',
+                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                transition: 'background 160ms ease',
+              }}>{tag}</button>
+            );
+          })}
         </div>
       )}
 
       {displayed.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+        <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🍽️</div>
-          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+          <div style={{
+            fontFamily: display, fontSize: 24, fontStyle: 'italic', fontWeight: 500,
+            color: THEME.ink, marginBottom: 10,
+          }}>
             {activeCollection ? `No recipes in "${activeCollection.name}"` : activeTag ? `No recipes tagged "${activeTag}"` : 'No recipes yet'}
           </div>
-          <div style={{ color: 'var(--text-dim)', marginBottom: 24 }}>
-            {activeCollection ? 'Open any recipe and use "+ Collection" to add it here.' : 'Generate meal options with Claude AI to get started.'}
+          <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14, lineHeight: 1.5 }}>
+            {activeCollection ? 'Open any recipe and use "+ Collection" to add it here.' : 'Generate meal options with AI to get started.'}
           </div>
-          {!activeCollection && <button className="btn-primary" onClick={() => setShowGenerate(true)}>✨ Generate Recipes</button>}
-        </div>
+          {!activeCollection && <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ Generate Recipes</button>}
+        </Glass>
       ) : (
         <div className="grid-auto">
           {displayed.map(recipe => (

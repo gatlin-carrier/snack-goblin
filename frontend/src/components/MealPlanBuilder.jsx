@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
 import RecipeModal from './RecipeModal.jsx';
 import PrepGuide from './PrepGuide.jsx';
+import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MEAL_SLOTS = [
-  { key: 'breakfast', label: 'Breakfast', icon: '🌅', color: '#f59e0b' },
-  { key: 'lunch', label: 'Lunch', icon: '☀️', color: '#10b981' },
-  { key: 'dinner', label: 'Dinner', icon: '🌙', color: '#7c6ff7' },
-  { key: 'snack', label: 'Snack', icon: '🍎', color: '#ec4899' },
+  { key: 'breakfast', label: 'Breakfast', tone: 'yellow', accent: 'oklch(0.55 0.12 80)' },
+  { key: 'lunch',     label: 'Lunch',     tone: 'sage',   accent: THEME.sage },
+  { key: 'dinner',    label: 'Dinner',    tone: 'accent', accent: THEME.accent },
+  { key: 'snack',     label: 'Snack',     tone: 'rust',   accent: THEME.rust },
 ];
+const SLOT_BY_KEY = Object.fromEntries(MEAL_SLOTS.map(s => [s.key, s]));
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontSize: 11, fontWeight: 700, color: THEME.accent,
+      letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,
+    }}>{children}</div>
+  );
+}
 
 export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigate, showToast }) {
   const [plan, setPlan] = useState(null);
@@ -24,15 +35,12 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
 
-  // Auto-curate state
   const [strategy, setStrategy] = useState('overlap');
   const [planDays, setPlanDays] = useState(5);
   const [curating, setCurating] = useState(false);
 
-  // Swap state — id of the primary item we're picking a swap target for
   const [swapFromId, setSwapFromId] = useState(null);
 
-  // Cost rollup
   const [cost, setCost] = useState(null);
 
   useEffect(() => { loadPlan(); }, []);
@@ -47,7 +55,6 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       const data = await res.json();
       setPlan(data);
       setCurrentPlan(data);
-      // Fetch cost rollup
       fetch(`/api/meal-plans/${data.id}/cost`).then(r => r.json()).then(setCost).catch(() => setCost(null));
     } finally {
       setLoading(false);
@@ -103,13 +110,27 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
     if (data.id) { showToast('Shopping list generated!'); onNavigate('shopping'); }
   }
 
-  if (loading) return <div className="page"><div style={{ color: 'var(--text-dim)', display: 'flex', gap: 10 }}><div className="spinner" /> Loading…</div></div>;
+  async function saveTemplate() {
+    if (!newTemplateName.trim() || savingTemplate) return;
+    setSavingTemplate(true);
+    await fetch('/api/plan-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTemplateName.trim(), plan_id: plan.id }) });
+    setNewTemplateName('');
+    const t = await fetch('/api/plan-templates').then(r => r.json());
+    setTemplates(t);
+    showToast('Template saved');
+    setSavingTemplate(false);
+  }
+
+  if (loading) return (
+    <div className="page">
+      <div style={{ color: THEME.dim, display: 'flex', gap: 10 }}><div className="spinner" /> Loading…</div>
+    </div>
+  );
 
   const allItems = plan?.items || [];
   const primaries = allItems.filter(i => !i.is_alternate);
   const alternates = allItems.filter(i => i.is_alternate);
 
-  // Build grid: [day][meal_type] = primary item
   const grid = {};
   const unscheduled = [];
   for (const item of primaries) {
@@ -121,7 +142,6 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
     }
   }
 
-  // Batch prep hints — only count primary items (alternates aren't being cooked)
   const ingMap = {};
   for (const item of primaries) {
     for (const ing of (item.ingredients || [])) {
@@ -138,100 +158,123 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
     <div className="page">
       <div className="page-header">
         <div>
-          <div className="page-title">Meal Plan</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 2 }}>
+          <div style={{
+            fontSize: 11, color: THEME.accent, fontWeight: 700,
+            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+          }}>The week ahead</div>
+          <div style={{
+            fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+          }}>Meal plan</div>
+          <div style={{ color: THEME.dim, fontSize: 13, marginTop: 6 }}>
             {filledSlots} of 28 slots filled
             {alternates.length > 0 && ` · ${alternates.length} alternates ready to swap`}
           </div>
         </div>
-        <div className="page-header-actions">
-          <button className="btn-ghost" onClick={() => setView(v => v === 'grid' ? 'list' : v === 'list' ? 'carousel' : 'grid')} style={{ fontSize: 13 }}>
+        <div className="page-header-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={{ ...glassBtnGhost, fontSize: 13 }} onClick={() => setView(v => v === 'grid' ? 'list' : v === 'list' ? 'carousel' : 'grid')}>
             {view === 'grid' ? '☰ List' : view === 'list' ? '🎴 Carousel' : '⊞ Grid'}
           </button>
-          <button className="btn-ghost" onClick={() => onNavigate('recipes')}>+ Browse</button>
-          <button className="btn-ghost" onClick={() => setShowTemplates(true)}>📋 Templates</button>
-          <button className="btn-ghost" onClick={() => setShowPrepGuide(true)} disabled={!primaries.length}>⚡ Prep Guide</button>
-          <button className="btn-primary" onClick={generateShoppingList} disabled={!primaries.length}>🛒 Shopping List</button>
+          <button style={glassBtnGhost} onClick={() => onNavigate('recipes')}>+ Browse</button>
+          <button style={glassBtnGhost} onClick={() => setShowTemplates(true)}>📋 Templates</button>
+          <button style={{ ...glassBtnGhost, opacity: !primaries.length ? 0.5 : 1 }} onClick={() => setShowPrepGuide(true)} disabled={!primaries.length}>⚡ Prep Guide</button>
+          <button style={{ ...glassBtnPrimary, opacity: !primaries.length ? 0.5 : 1 }} onClick={generateShoppingList} disabled={!primaries.length}>🛒 Shopping List</button>
         </div>
       </div>
 
       {/* Auto-curate panel */}
-      <div className="card" style={{ marginBottom: 20, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <Glass padding={16} style={{ marginBottom: 22, display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 18 }}>✨</span>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Auto-curate week</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: THEME.ink, letterSpacing: '0.04em' }}>Auto-curate week</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Strategy:</span>
-          <div style={{ display: 'flex', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
-            <button
-              onClick={() => setStrategy('overlap')}
-              title="Maximize shared ingredients across the week — minimizes shopping cost"
-              style={{
-                background: strategy === 'overlap' ? 'var(--accent)' : 'transparent',
-                color: strategy === 'overlap' ? 'white' : 'var(--text-dim)',
-                border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
-            >Overlap</button>
-            <button
-              onClick={() => setStrategy('top-rated')}
-              title="Pick highest-rated recipes regardless of ingredient overlap"
-              style={{
-                background: strategy === 'top-rated' ? 'var(--accent)' : 'transparent',
-                color: strategy === 'top-rated' ? 'white' : 'var(--text-dim)',
-                border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
-            >Top Rated</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontSize: 10, color: THEME.dim, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>Strategy</span>
+          <div style={{
+            display: 'flex',
+            background: 'oklch(1 0 0 / 0.45)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: 999, padding: 3,
+            boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
+          }}>
+            {[
+              { key: 'overlap',   label: 'Overlap',   title: 'Maximize shared ingredients — cheapest shopping' },
+              { key: 'top-rated', label: 'Top Rated', title: 'Pick highest-rated recipes regardless of overlap' },
+              { key: 'novelty',   label: '✨ Novelty', title: 'ADHD mode — minimize shared ingredients, every day feels new' },
+            ].map(s => (
+              <button
+                key={s.key}
+                onClick={() => setStrategy(s.key)}
+                title={s.title}
+                style={{
+                  background: strategy === s.key
+                    ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
+                    : 'transparent',
+                  color: strategy === s.key ? 'white' : THEME.dim,
+                  border: 'none', borderRadius: 999, padding: '5px 14px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  boxShadow: strategy === s.key ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+                }}
+              >{s.label}</button>
+            ))}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Days:</span>
-          <select value={planDays} onChange={e => setPlanDays(Number(e.target.value))} style={{ fontSize: 13, padding: '5px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontSize: 10, color: THEME.dim, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>Days</span>
+          <select value={planDays} onChange={e => setPlanDays(Number(e.target.value))} style={{ fontSize: 13, padding: '6px 10px', width: 64 }}>
             {[3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
 
-        <button className="btn-primary" onClick={autoCurate} disabled={curating} style={{ fontSize: 13, padding: '8px 16px' }}>
+        <button style={{ ...glassBtnPrimary, fontSize: 13 }} onClick={autoCurate} disabled={curating}>
           {curating ? '…' : primaries.length ? 'Re-curate' : 'Auto-fill week'}
         </button>
 
         {cost && cost.total_usd > 0 && (
-          <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)' }}>
-            Est. weekly cost:{' '}
-            <span style={{ color: 'var(--green)', fontWeight: 700 }}>${cost.total_usd.toFixed(0)}</span>
+          <div style={{ marginLeft: 'auto', fontSize: 12, color: THEME.dim }}>
+            Est. weekly cost{' '}
+            <span style={{ color: THEME.sage, fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: 14 }}>${cost.total_usd.toFixed(0)}</span>
             {cost.meals_with_cost_data < cost.meals && (
-              <span style={{ fontSize: 11, marginLeft: 4 }}> ({cost.meals_with_cost_data}/{cost.meals} priced)</span>
+              <span style={{ fontSize: 11, marginLeft: 4, color: THEME.faint }}> ({cost.meals_with_cost_data}/{cost.meals} priced)</span>
             )}
           </div>
         )}
-      </div>
+      </Glass>
 
       {/* Unscheduled pool */}
       {unscheduled.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div className="section-title">Unscheduled — drag to a slot</div>
+        <div style={{ marginBottom: 22 }}>
+          <SectionLabel>Unscheduled · drag to a slot</SectionLabel>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {unscheduled.map(item => (
-              <div
-                key={item.id}
-                className="card"
-                draggable
-                onDragStart={() => setDragging(item)}
-                onDragEnd={() => setDragging(null)}
-                style={{ cursor: 'grab', padding: '10px 14px', minWidth: 160, opacity: dragging?.id === item.id ? 0.5 : 1 }}
-              >
-                <div style={{ fontSize: 12, color: item.meal_type === 'breakfast' ? '#f59e0b' : item.meal_type === 'lunch' ? '#10b981' : item.meal_type === 'snack' ? '#ec4899' : 'var(--accent)', fontWeight: 600, marginBottom: 2 }}>
-                  {MEAL_SLOTS.find(s => s.key === item.meal_type)?.icon} {item.meal_type}
+            {unscheduled.map(item => {
+              const slot = SLOT_BY_KEY[item.meal_type];
+              return (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => setDragging(item)}
+                  onDragEnd={() => setDragging(null)}
+                  style={{ cursor: 'grab', minWidth: 180, opacity: dragging?.id === item.id ? 0.5 : 1 }}
+                >
+                  <Glass padding={12}>
+                    <Badge tone={slot?.tone || 'neutral'}>{item.meal_type}</Badge>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginTop: 8, color: THEME.ink, lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                      <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 10px' }} onClick={() => setSelected(item)}>View</button>
+                      <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 10px', color: THEME.red }} onClick={() => removeItem(item)}>✕</button>
+                    </div>
+                  </Glass>
                 </div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{item.name}</div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <button className="btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => setSelected(item)}>View</button>
-                  <button className="btn-danger" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => removeItem(item)}>✕</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -245,100 +288,145 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
             const heroMeal = daysMeals.dinner || daysMeals.lunch || daysMeals.breakfast || daysMeals.snack;
             const heroImage = heroMeal?.image_url;
             return (
-              <div key={dayIdx} className={`meal-day-card${isToday ? ' today' : ''}`} style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{
-                  height: isToday ? 130 : 80,
-                  background: heroImage
-                    ? `linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.65) 100%), url("${heroImage}") center/cover`
-                    : 'linear-gradient(135deg, rgba(124,111,247,0.25), rgba(255,255,255,0.04))',
-                  display: 'flex', alignItems: 'flex-end', padding: '10px 14px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <div style={{ fontWeight: 700, fontSize: isToday ? 20 : 16, color: heroImage ? 'white' : 'var(--text)', textShadow: heroImage ? '0 1px 4px rgba(0,0,0,0.6)' : 'none' }}>{dayLabel}</div>
-                    {isToday && <div style={{ fontSize: 10, fontWeight: 700, color: 'white', background: 'rgba(124,111,247,0.85)', padding: '3px 8px', borderRadius: 20, letterSpacing: '0.06em', backdropFilter: 'blur(6px)' }}>TODAY</div>}
-                  </div>
-                </div>
-                <div style={{ padding: 14 }}>
-                {mealCount === 0 && (
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '12px 0' }}>
-                    Nothing planned. Use Auto-curate or drag from Unscheduled.
-                  </div>
-                )}
-                {MEAL_SLOTS.map(slot => {
-                  const meal = daysMeals[slot.key];
-                  if (!meal && !isToday) return null; // hide empty slots on non-today days
-                  return (
-                    <div key={slot.key} style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: slot.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                        {slot.icon} {slot.label}
-                      </div>
-                      {meal ? (
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: isToday ? 15 : 13, lineHeight: 1.3, marginBottom: 4 }}>{meal.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: isToday ? 8 : 0 }}>
-                            <span>🌍 {meal.cuisine}</span>
-                            <span>⏱ {(meal.prep_time_min || 0) + (meal.cook_time_min || 0)} min</span>
-                            {meal.cost_per_serving != null && <span style={{ color: 'var(--green)', fontWeight: 600 }}>≈${meal.cost_per_serving.toFixed(0)}/serving</span>}
-                          </div>
-                          {isToday && meal.description && (
-                            <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 10 }}>{meal.description}</div>
-                          )}
-                          {isToday && meal.ingredients?.length > 0 && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                                Ingredients ({meal.ingredients.length})
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {meal.ingredients.slice(0, 6).map((ing, i) => (
-                                  <span key={i} className="tag">{ing.name}</span>
-                                ))}
-                                {meal.ingredients.length > 6 && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>+{meal.ingredients.length - 6} more</span>}
-                              </div>
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                            <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSelected(meal)}>👁 View</button>
-                            {alternates.length > 0 && (
-                              <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSwapFromId(swapFromId === meal.id ? null : meal.id)}>🔄 Swap</button>
-                            )}
-                            <button className="btn-danger" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => removeItem(meal)}>✕</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', padding: '6px 0' }}>— empty —</div>
+              <div key={dayIdx} style={{ position: 'relative' }}>
+                <Glass padding={0} style={{ overflow: 'hidden', outline: isToday ? `2px solid ${THEME.accent}` : 'none', outlineOffset: -1 }}>
+                  <div style={{
+                    height: isToday ? 140 : 88,
+                    background: heroImage
+                      ? `linear-gradient(180deg, transparent 35%, oklch(0.20 0.02 50 / 0.65) 100%), url("${heroImage}") center/cover`
+                      : `linear-gradient(135deg, oklch(0.85 0.12 35 / 0.4), oklch(0.82 0.10 80 / 0.25))`,
+                    display: 'flex', alignItems: 'flex-end', padding: '12px 16px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{
+                        fontFamily: display,
+                        fontWeight: 500, fontStyle: 'italic',
+                        fontSize: isToday ? 26 : 19,
+                        color: heroImage ? 'oklch(1 0 0)' : THEME.ink,
+                        textShadow: heroImage ? '0 1px 6px oklch(0.20 0.02 50 / 0.6)' : 'none',
+                        letterSpacing: '-0.01em',
+                      }}>{dayLabel}</div>
+                      {isToday && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, color: 'white',
+                          background: 'oklch(0.62 0.14 35 / 0.85)',
+                          padding: '4px 10px', borderRadius: 999,
+                          letterSpacing: '0.12em',
+                          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                          boxShadow: '0 0 0 0.5px oklch(1 0 0 / 0.3)',
+                        }}>TODAY</span>
                       )}
                     </div>
-                  );
-                })}
-                </div>
+                  </div>
+                  <div style={{ padding: 14 }}>
+                    {mealCount === 0 && (
+                      <div style={{ fontSize: 13, color: THEME.dim, padding: '12px 0', fontStyle: 'italic' }}>
+                        Nothing planned. Use Auto-curate or drag from Unscheduled.
+                      </div>
+                    )}
+                    {MEAL_SLOTS.map(slot => {
+                      const meal = daysMeals[slot.key];
+                      if (!meal && !isToday) return null;
+                      return (
+                        <div key={slot.key} style={{
+                          borderTop: `1px solid ${THEME.hairline}`, paddingTop: 10, marginTop: 10,
+                        }}>
+                          <div style={{
+                            fontSize: 10, fontWeight: 700, color: slot.accent,
+                            textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6,
+                          }}>{slot.label}</div>
+                          {meal ? (
+                            <div>
+                              <div style={{
+                                fontWeight: 600, fontSize: isToday ? 15 : 13,
+                                lineHeight: 1.3, marginBottom: 4, color: THEME.ink,
+                              }}>{meal.name}</div>
+                              <div style={{ fontSize: 11, color: THEME.dim, display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: isToday ? 8 : 0 }}>
+                                <span>{meal.cuisine}</span>
+                                <span style={{ color: THEME.faint }}>·</span>
+                                <span>{(meal.prep_time_min || 0) + (meal.cook_time_min || 0)} min</span>
+                                {meal.cost_per_serving != null && (
+                                  <>
+                                    <span style={{ color: THEME.faint }}>·</span>
+                                    <span style={{ color: THEME.sage, fontWeight: 600 }}>${meal.cost_per_serving.toFixed(0)}/serving</span>
+                                  </>
+                                )}
+                              </div>
+                              {isToday && meal.description && (
+                                <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.5, marginBottom: 10 }}>{meal.description}</div>
+                              )}
+                              {isToday && meal.ingredients?.length > 0 && (
+                                <div style={{ marginBottom: 10 }}>
+                                  <div style={{
+                                    fontSize: 10, fontWeight: 700, color: THEME.dim,
+                                    textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6,
+                                  }}>Ingredients · {meal.ingredients.length}</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                    {meal.ingredients.slice(0, 6).map((ing, i) => (
+                                      <Badge key={i} tone="neutral">{ing.name}</Badge>
+                                    ))}
+                                    {meal.ingredients.length > 6 && (
+                                      <span style={{ fontSize: 11, color: THEME.dim, alignSelf: 'center' }}>+{meal.ingredients.length - 6} more</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} onClick={() => setSelected(meal)}>View</button>
+                                {alternates.length > 0 && (
+                                  <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} onClick={() => setSwapFromId(swapFromId === meal.id ? null : meal.id)}>🔄 Swap</button>
+                                )}
+                                <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px', color: THEME.red }} onClick={() => removeItem(meal)}>✕</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: THEME.faint, fontStyle: 'italic', padding: '4px 0' }}>— empty —</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Glass>
               </div>
             );
           })}
         </div>
       ) : view === 'grid' ? (
-        <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+        <Glass padding={4} style={{ overflow: 'auto', marginBottom: 24 }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 700 }}>
             <thead>
               <tr>
-                <th style={{ width: 80, padding: '8px 10px', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>Meal</th>
-                {DAYS.map(d => (
-                  <th key={d} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)' }}>{d}</th>
+                <th style={{
+                  width: 90, padding: '12px', textAlign: 'left',
+                  fontSize: 10, color: THEME.dim, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                }}>Meal</th>
+                {DAYS.map((d, i) => (
+                  <th key={d} style={{
+                    padding: '12px 6px', textAlign: 'center',
+                    fontSize: 11, fontWeight: 700,
+                    color: i === todayDow ? THEME.accent : THEME.dim,
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                  }}>{d}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {MEAL_SLOTS.map(slot => (
                 <tr key={slot.key}>
-                  <td style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, color: slot.color, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
-                    {slot.icon} {slot.label}
-                  </td>
+                  <td style={{
+                    padding: '8px 12px', fontSize: 11, fontWeight: 700,
+                    color: slot.accent, whiteSpace: 'nowrap',
+                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                    borderTop: `1px solid ${THEME.hairline}`,
+                  }}>{slot.label}</td>
                   {DAYS.map((day, dayIdx) => {
                     const cell = grid[dayIdx]?.[slot.key];
                     const isTarget = dragTarget?.day === dayIdx && dragTarget?.meal === slot.key;
                     return (
                       <td
                         key={dayIdx}
-                        style={{ padding: 4, verticalAlign: 'top', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}
+                        style={{ padding: 4, verticalAlign: 'top', borderTop: `1px solid ${THEME.hairline}`, borderLeft: `1px solid ${THEME.hairline}` }}
                         onDragOver={e => { e.preventDefault(); setDragTarget({ day: dayIdx, meal: slot.key }); }}
                         onDragLeave={() => setDragTarget(null)}
                         onDrop={async e => {
@@ -347,7 +435,19 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                           if (dragging) { await assignSlot(dragging, dayIdx, slot.key); setDragging(null); }
                         }}
                       >
-                        <div style={{ minHeight: 64, background: isTarget ? 'rgba(124,111,247,0.1)' : cell ? 'var(--surface2)' : 'transparent', borderRadius: 6, border: isTarget ? '1px dashed var(--accent)' : '1px dashed transparent', padding: cell ? 6 : 0, transition: 'background 0.1s' }}>
+                        <div style={{
+                          minHeight: 72,
+                          background: isTarget
+                            ? 'oklch(0.62 0.14 35 / 0.12)'
+                            : cell ? 'oklch(1 0 0 / 0.5)' : 'transparent',
+                          backdropFilter: cell ? 'blur(12px)' : 'none',
+                          WebkitBackdropFilter: cell ? 'blur(12px)' : 'none',
+                          borderRadius: 12,
+                          border: isTarget ? `1px dashed ${THEME.accent}` : '1px dashed transparent',
+                          padding: cell ? 8 : 0,
+                          transition: 'background 0.1s',
+                          boxShadow: cell ? 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12)' : 'none',
+                        }}>
                           {cell ? (
                             <div
                               draggable
@@ -355,22 +455,22 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                               onDragEnd={() => setDragging(null)}
                               style={{ cursor: 'grab', opacity: dragging?.id === cell.id ? 0.4 : 1 }}
                             >
-                              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, lineHeight: 1.3 }}>{cell.name}</div>
-                              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{cell.cuisine}</div>
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                <button style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11, padding: 0 }} onClick={() => setSelected(cell)}>👁</button>
+                              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, lineHeight: 1.3, color: THEME.ink }}>{cell.name}</div>
+                              <div style={{ fontSize: 10, color: THEME.dim, marginBottom: 6 }}>{cell.cuisine}</div>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 12, padding: 0 }} title="View" onClick={() => setSelected(cell)}>👁</button>
                                 {alternates.length > 0 && (
                                   <button
-                                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: 0 }}
+                                    style={{ background: 'none', border: 'none', color: THEME.accent, cursor: 'pointer', fontSize: 12, padding: 0 }}
                                     onClick={() => setSwapFromId(swapFromId === cell.id ? null : cell.id)}
                                     title="Swap from alternates"
                                   >🔄</button>
                                 )}
-                                <button style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 11, padding: 0 }} onClick={() => removeItem(cell)}>✕</button>
+                                <button style={{ background: 'none', border: 'none', color: THEME.red, cursor: 'pointer', fontSize: 12, padding: 0 }} title="Remove" onClick={() => removeItem(cell)}>✕</button>
                               </div>
                             </div>
                           ) : (
-                            <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--border)', fontSize: 18 }}>+</div>
+                            <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', color: THEME.faint, fontSize: 18 }}>+</div>
                           )}
                         </div>
                       </td>
@@ -380,46 +480,50 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
               ))}
             </tbody>
           </table>
-        </div>
+        </Glass>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
           {primaries.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-dim)' }}>No meals planned yet</div>
+            <Glass padding={32} style={{ textAlign: 'center' }}>
+              <div style={{ color: THEME.dim }}>No meals planned yet</div>
+            </Glass>
           ) : (
-            primaries.map(item => (
-              <div key={item.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
-                <div style={{ fontSize: 20 }}>{MEAL_SLOTS.find(s => s.key === item.meal_type)?.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{item.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                    {item.meal_type} · {item.cuisine}
-                    {item.day_of_week != null ? ` · ${DAYS[item.day_of_week]}` : ' · Unscheduled'}
-                    {item.cost_per_serving != null && ` · ≈$${item.cost_per_serving.toFixed(0)}/serving`}
+            primaries.map(item => {
+              const slot = SLOT_BY_KEY[item.meal_type];
+              return (
+                <Glass key={item.id} padding={14} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <Badge tone={slot?.tone || 'neutral'}>{item.meal_type}</Badge>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: THEME.ink }}>{item.name}</div>
+                    <div style={{ fontSize: 12, color: THEME.dim }}>
+                      {item.cuisine}
+                      {item.day_of_week != null ? ` · ${DAYS[item.day_of_week]}` : ' · Unscheduled'}
+                      {item.cost_per_serving != null && ` · $${item.cost_per_serving.toFixed(0)}/serving`}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {alternates.length > 0 && (
-                    <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setSwapFromId(swapFromId === item.id ? null : item.id)}>🔄 Swap</button>
-                  )}
-                  <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setSelected(item)}>View</button>
-                  <button className="btn-danger" style={{ fontSize: 12 }} onClick={() => removeItem(item)}>Remove</button>
-                </div>
-              </div>
-            ))
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {alternates.length > 0 && (
+                      <button style={{ ...glassBtnGhost, fontSize: 12 }} onClick={() => setSwapFromId(swapFromId === item.id ? null : item.id)}>🔄 Swap</button>
+                    )}
+                    <button style={{ ...glassBtnGhost, fontSize: 12 }} onClick={() => setSelected(item)}>View</button>
+                    <button style={{ ...glassBtnGhost, fontSize: 12, color: THEME.red }} onClick={() => removeItem(item)}>Remove</button>
+                  </div>
+                </Glass>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* Swap picker — appears when swapFromId is set */}
       {swapFromId && alternates.length > 0 && (() => {
         const target = primaries.find(p => p.id === swapFromId);
         return (
-          <div className="card" style={{ marginBottom: 20, background: 'rgba(124,111,247,0.06)', borderColor: 'rgba(124,111,247,0.3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontWeight: 600 }}>
+          <Glass tint="oklch(0.62 0.14 35 / 0.12)" padding={16} style={{ marginBottom: 22 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: THEME.ink, fontSize: 13 }}>
                 🔄 Swap "{target?.name}" with…
               </div>
-              <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setSwapFromId(null)}>Cancel</button>
+              <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} onClick={() => setSwapFromId(null)}>Cancel</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
               {alternates.map(alt => (
@@ -427,68 +531,75 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                   key={alt.id}
                   onClick={() => swapWith(swapFromId, alt.id)}
                   style={{
-                    background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px',
-                    textAlign: 'left', cursor: 'pointer', color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: 4,
+                    background: 'oklch(1 0 0 / 0.55)',
+                    backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                    border: 'none', borderRadius: 14, padding: '12px 14px',
+                    textAlign: 'left', cursor: 'pointer', color: THEME.text,
+                    display: 'flex', flexDirection: 'column', gap: 4,
+                    fontFamily: 'inherit',
+                    boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.7), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{alt.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: THEME.ink }}>{alt.name}</div>
+                  <div style={{ fontSize: 11, color: THEME.dim }}>
                     {alt.cuisine}
-                    {alt.cost_per_serving != null && ` · ≈$${alt.cost_per_serving.toFixed(0)}/serving`}
+                    {alt.cost_per_serving != null && ` · $${alt.cost_per_serving.toFixed(0)}/serving`}
                     {alt.star_rating > 0 && ` · ★${alt.star_rating.toFixed(1)}`}
                   </div>
                 </button>
               ))}
             </div>
-          </div>
+          </Glass>
         );
       })()}
 
-      {/* Alternates pool — shown when not actively swapping */}
       {alternates.length > 0 && !swapFromId && (
         <div style={{ marginBottom: 24 }}>
-          <div className="section-title">🔁 Alternates ({alternates.length}) — click 🔄 on any day to swap one in</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          <SectionLabel>🔁 Alternates · {alternates.length} ready</SectionLabel>
+          <div style={{ fontSize: 12, color: THEME.dim, marginTop: -8, marginBottom: 12 }}>Click 🔄 on any day to swap one in</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {alternates.map(alt => (
-              <div key={alt.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{alt.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              <Glass key={alt.id} padding={12}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: THEME.ink }}>{alt.name}</div>
+                <div style={{ fontSize: 11, color: THEME.dim, marginTop: 2 }}>
                   {alt.cuisine}
-                  {alt.cost_per_serving != null && ` · ≈$${alt.cost_per_serving.toFixed(0)}`}
+                  {alt.cost_per_serving != null && ` · $${alt.cost_per_serving.toFixed(0)}`}
                   {alt.star_rating > 0 && ` · ★${alt.star_rating.toFixed(1)}`}
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                  <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => setSelected(alt)}>View</button>
-                  <button className="btn-danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => removeItem(alt)}>✕</button>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 10px' }} onClick={() => setSelected(alt)}>View</button>
+                  <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 10px', color: THEME.red }} onClick={() => removeItem(alt)}>✕</button>
                 </div>
-              </div>
+              </Glass>
             ))}
           </div>
         </div>
       )}
 
       {primaries.length === 0 && !unscheduled.length && (
-        <div className="card" style={{ textAlign: 'center', padding: 48, marginBottom: 24 }}>
+        <Glass padding={48} style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Nothing planned yet</div>
-          <div style={{ color: 'var(--text-dim)', marginBottom: 20 }}>
+          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>Nothing planned yet</div>
+          <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14 }}>
             Use Auto-curate above to fill the week from your recipes, or browse and add manually.
           </div>
-          <button className="btn-primary" onClick={() => onNavigate('recipes')}>Browse Recipes</button>
-        </div>
+          <button style={glassBtnPrimary} onClick={() => onNavigate('recipes')}>Browse Recipes</button>
+        </Glass>
       )}
 
-      {/* Batch prep hints */}
       {shared.length > 0 && (
-        <div className="card" style={{ background: 'rgba(124,111,247,0.05)', borderColor: 'rgba(124,111,247,0.2)' }}>
-          <div style={{ fontWeight: 600, marginBottom: 10 }}>⚡ Batch Prep Opportunities</div>
+        <Glass tint="oklch(0.78 0.09 30 / 0.18)" padding={16}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: THEME.accent,
+            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,
+          }}>⚡ Batch prep opportunities</div>
           {shared.map(([ing, meals]) => (
-            <div key={ing} style={{ fontSize: 13, marginBottom: 4 }}>
-              <span style={{ fontWeight: 500 }}>{ing.charAt(0).toUpperCase() + ing.slice(1)}</span>
-              <span style={{ color: 'var(--text-dim)' }}> — {meals.join(', ')}</span>
+            <div key={ing} style={{ fontSize: 13, marginBottom: 6, color: THEME.text }}>
+              <span style={{ fontWeight: 600, color: THEME.ink }}>{ing.charAt(0).toUpperCase() + ing.slice(1)}</span>
+              <span style={{ color: THEME.dim }}> — {meals.join(', ')}</span>
             </div>
           ))}
-        </div>
+        </Glass>
       )}
 
       {selected && <RecipeModal recipe={selected} onClose={() => setSelected(null)} />}
@@ -496,60 +607,51 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
 
       {showTemplates && (
         <div className="modal-backdrop" onClick={() => setShowTemplates(false)}>
-          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div style={{ fontWeight: 700, fontSize: 18 }}>📋 Plan Templates</div>
+              <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, fontWeight: 500 }}>Plan templates</div>
               <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: THEME.dim, marginBottom: 18, lineHeight: 1.5 }}>
                 Save the current week as a reusable template, or load a past week's plan to kick off this week.
               </div>
 
               {primaries.length > 0 && (
-                <div style={{ marginBottom: 20, background: 'var(--surface2)', borderRadius: 10, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Save current plan ({primaries.length} meals)</div>
+                <Glass padding={14} style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: THEME.dim, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Save current plan · {primaries.length} meals
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input value={newTemplateName} onChange={e => setNewTemplateName(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && !savingTemplate && newTemplateName.trim() && (async () => {
-                        setSavingTemplate(true);
-                        await fetch('/api/plan-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTemplateName.trim(), plan_id: plan.id }) });
-                        setNewTemplateName('');
-                        const t = await fetch('/api/plan-templates').then(r => r.json());
-                        setTemplates(t);
-                        showToast('Template saved');
-                        setSavingTemplate(false);
-                      })()}
-                      placeholder="Template name…" style={{ flex: 1 }} />
-                    <button className="btn-primary" disabled={!newTemplateName.trim() || savingTemplate}
-                      onClick={async () => {
-                        setSavingTemplate(true);
-                        await fetch('/api/plan-templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTemplateName.trim(), plan_id: plan.id }) });
-                        setNewTemplateName('');
-                        const t = await fetch('/api/plan-templates').then(r => r.json());
-                        setTemplates(t);
-                        showToast('Template saved');
-                        setSavingTemplate(false);
-                      }}>
+                    <input
+                      value={newTemplateName}
+                      onChange={e => setNewTemplateName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveTemplate()}
+                      placeholder="Template name…"
+                      style={{ flex: 1 }}
+                    />
+                    <button style={{ ...glassBtnPrimary, opacity: !newTemplateName.trim() || savingTemplate ? 0.5 : 1 }}
+                      disabled={!newTemplateName.trim() || savingTemplate}
+                      onClick={saveTemplate}>
                       {savingTemplate ? 'Saving…' : 'Save'}
                     </button>
                   </div>
-                </div>
+                </Glass>
               )}
 
               {templates.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-dim)', fontSize: 14 }}>
+                <div style={{ textAlign: 'center', padding: '24px 0', color: THEME.dim, fontSize: 14 }}>
                   No templates yet. Save a plan you like to reuse it next week.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {templates.map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface2)', borderRadius: 10, padding: '12px 14px' }}>
+                    <Glass key={t.id} padding={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{t.meal_count} meals</div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: THEME.ink }}>{t.name}</div>
+                        <div style={{ fontSize: 12, color: THEME.dim, marginTop: 2 }}>{t.meal_count} meals</div>
                       </div>
-                      <button className="btn-primary" style={{ fontSize: 12, padding: '6px 12px' }}
+                      <button style={{ ...glassBtnPrimary, fontSize: 12, padding: '6px 14px' }}
                         onClick={async () => {
                           const res = await fetch(`/api/meal-plans/from-template/${t.id}`, { method: 'POST' });
                           if (res.ok) { showToast(`Loaded "${t.name}"`); setShowTemplates(false); loadPlan(); }
@@ -561,8 +663,8 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                         await fetch(`/api/plan-templates/${t.id}`, { method: 'DELETE' });
                         setTemplates(ts => ts.filter(x => x.id !== t.id));
                         showToast(`Deleted "${t.name}"`);
-                      }} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16, padding: '2px 4px' }}>✕</button>
-                    </div>
+                      }} style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>✕</button>
+                    </Glass>
                   ))}
                 </div>
               )}

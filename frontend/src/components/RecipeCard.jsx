@@ -1,5 +1,7 @@
-const MEAL_TYPE_ICONS = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
-const MEAL_TYPE_COLORS = { breakfast: '#f59e0b', lunch: '#10b981', dinner: '#7c6ff7', snack: '#ec4899' };
+import { Glass, Badge, PhotoBg, THEME, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+
+const MEAL_TYPE_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+const MEAL_TYPE_TONE  = { breakfast: 'yellow',     lunch: 'sage',  dinner: 'accent', snack: 'rust' };
 
 function StarRating({ rating, count, onRate, size = 'sm' }) {
   const stars = [1, 2, 3, 4, 5];
@@ -13,7 +15,7 @@ function StarRating({ rating, count, onRate, size = 'sm' }) {
           style={{
             fontSize: px,
             cursor: onRate ? 'pointer' : 'default',
-            color: s <= Math.round(rating || 0) ? '#facc15' : 'var(--border)',
+            color: s <= Math.round(rating || 0) ? 'oklch(0.78 0.15 85)' : 'oklch(0.4 0.02 60 / 0.25)',
             lineHeight: 1,
             userSelect: 'none',
           }}
@@ -21,7 +23,7 @@ function StarRating({ rating, count, onRate, size = 'sm' }) {
         >★</span>
       ))}
       {count > 0 && (
-        <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 4 }}>
+        <span style={{ fontSize: 11, color: THEME.dim, marginLeft: 4 }}>
           {rating?.toFixed(1)} ({count})
         </span>
       )}
@@ -35,72 +37,106 @@ export default function RecipeCard({ recipe, selected, onClick, onAdd, onDiscard
   const n = recipe.nutrition || {};
   const hasHazards = recipe.choking_hazards?.length > 0;
   const mealType = recipe.meal_type || 'dinner';
-  const color = MEAL_TYPE_COLORS[mealType];
+  const totalMin = (recipe.prep_time_min || 0) + (recipe.cook_time_min || 0);
 
   return (
-    <div className={`card recipe-card${selected ? ' selected' : ''}`} onClick={onClick} style={{ padding: 0, overflow: 'hidden' }}>
-      {/* Hero image (or gradient fallback) */}
-      <div style={{
+    <div
+      onClick={onClick}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
         position: 'relative',
-        height: 140,
-        background: recipe.image_url
-          ? `linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.5) 100%), url("${recipe.image_url}") center/cover`
-          : `linear-gradient(135deg, ${color}40, ${color}10)`,
-      }}>
-        {!recipe.image_url && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, opacity: 0.5 }}>
-            {MEAL_TYPE_ICONS[mealType]}
+        outline: selected ? `2px solid ${THEME.accent}` : 'none',
+        outlineOffset: -1,
+        borderRadius: 22,
+      }}
+    >
+      <Glass padding={0} style={{ overflow: 'hidden' }}>
+        <PhotoBg
+          name={recipe.name}
+          cuisine={recipe.cuisine}
+          src={recipe.image_url}
+          h={150}
+        >
+          <div style={{ position: 'absolute', top: 10, right: 10 }}>
+            <Badge tone={MEAL_TYPE_TONE[mealType] || 'neutral'}>{MEAL_TYPE_LABEL[mealType] || mealType}</Badge>
           </div>
-        )}
-        <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 600, color: 'white', background: `${color}cc`, padding: '3px 9px', borderRadius: 20, whiteSpace: 'nowrap', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          {MEAL_TYPE_ICONS[mealType]} {mealType}
-        </span>
-      </div>
-
-      <div style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div className="recipe-card-name" style={{ flex: 1 }}>{recipe.name}</div>
-      </div>
-      <div className="recipe-card-meta">
-        <span>🌍 {recipe.cuisine}</span>
-        <span>⏱ {(recipe.prep_time_min || 0) + (recipe.cook_time_min || 0)} min</span>
-        {recipe.cost_per_serving != null && (
-          <span style={{ color: 'var(--green)', fontWeight: 600 }} title="Estimated cost per serving (current US grocery prices)">
-            ≈ ${recipe.cost_per_serving.toFixed(0)}/serving
-          </span>
-        )}
-        {n.iron_mg > 3 && <span style={{ color: 'var(--green)' }}>🩸 Iron</span>}
-        {n.dha_mg > 50 && <span style={{ color: 'var(--accent)' }}>🐟 DHA</span>}
-      </div>
-      <div className="recipe-card-desc">{recipe.description}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <StarRating rating={recipe.star_rating} count={recipe.rating_count} onRate={onRate} />
-        {recipe.in_rotation === 0 && (
-          <span style={{ fontSize: 11, color: 'var(--red)', background: 'rgba(248,113,113,0.1)', padding: '1px 6px', borderRadius: 10 }}>paused</span>
-        )}
-      </div>
-      <div className="recipe-card-footer">
-        {recipe.toddler_safe ? (
-          <span className="badge badge-green">👶 Toddler OK</span>
-        ) : (
-          <span className="badge badge-red">⚠️ Modify</span>
-        )}
-        {hasHazards && <span className="badge badge-yellow">✂️ Prep needed</span>}
-        {(recipe.tags || []).slice(0, 2).map(t => <span key={t} className="tag">{t}</span>)}
-      </div>
-      {(onAdd || onDiscard) && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }} onClick={e => e.stopPropagation()}>
-          {onAdd && (
-            <button className="btn-primary" style={{ flex: 1, fontSize: 13 }} onClick={onAdd} disabled={planItemCount >= 35}>
-              + Add to Week
-            </button>
+          {recipe.in_rotation === 0 && (
+            <div style={{ position: 'absolute', top: 10, left: 10 }}>
+              <Badge tone="rust">paused</Badge>
+            </div>
           )}
-          {onDiscard && (
-            <button className="btn-danger" onClick={onDiscard} title="Delete recipe">✕</button>
+        </PhotoBg>
+
+        <div style={{ padding: 16 }}>
+          <div style={{
+            fontFamily: 'inherit', fontSize: 16, fontWeight: 600, lineHeight: 1.25,
+            color: THEME.ink, marginBottom: 6,
+          }}>{recipe.name}</div>
+
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+            fontSize: 12, color: THEME.dim, marginBottom: 10,
+          }}>
+            <span>{recipe.cuisine}</span>
+            <span style={{ color: THEME.faint }}>·</span>
+            <span>{totalMin} min</span>
+            {recipe.cost_per_serving != null && (
+              <>
+                <span style={{ color: THEME.faint }}>·</span>
+                <span style={{ color: THEME.sage, fontWeight: 600 }} title="Estimated cost per serving">
+                  ${recipe.cost_per_serving.toFixed(0)}/serving
+                </span>
+              </>
+            )}
+            {n.iron_mg > 3 && <span style={{ color: THEME.sage }}>· Iron</span>}
+            {n.dha_mg > 50 && <span style={{ color: THEME.accent }}>· DHA</span>}
+          </div>
+
+          <div style={{
+            fontSize: 13, color: THEME.text, lineHeight: 1.45,
+            marginBottom: 12,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>{recipe.description}</div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <StarRating rating={recipe.star_rating} count={recipe.rating_count} onRate={onRate} />
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {recipe.toddler_safe ? (
+              <Badge tone="sage">👶 Toddler OK</Badge>
+            ) : (
+              <Badge tone="rust">⚠ Modify</Badge>
+            )}
+            {hasHazards && <Badge tone="yellow">✂ Prep needed</Badge>}
+            {(recipe.tags || []).slice(0, 2).map(t => (
+              <Badge key={t} tone="neutral">{t}</Badge>
+            ))}
+          </div>
+
+          {(onAdd || onDiscard) && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }} onClick={e => e.stopPropagation()}>
+              {onAdd && (
+                <button
+                  style={{ ...glassBtnPrimary, flex: 1, fontSize: 13, opacity: planItemCount >= 35 ? 0.5 : 1 }}
+                  onClick={onAdd}
+                  disabled={planItemCount >= 35}
+                >
+                  + Add to Week
+                </button>
+              )}
+              {onDiscard && (
+                <button
+                  style={{ ...glassBtnGhost, color: THEME.red, padding: '9px 14px' }}
+                  onClick={onDiscard}
+                  title="Delete recipe"
+                >✕</button>
+              )}
+            </div>
           )}
         </div>
-      )}
-      </div>
+      </Glass>
     </div>
   );
 }

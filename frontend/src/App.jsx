@@ -13,26 +13,102 @@ import ChildProfile from './components/ChildProfile.jsx';
 import AdultGoals from './components/AdultGoals.jsx';
 import FirstFoodsLog from './components/FirstFoodsLog.jsx';
 import CollectionsPanel from './components/CollectionsPanel.jsx';
+import { GlassPill, THEME } from './lib/glass.jsx';
 
-const VIEWS = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'recipes',   label: 'Recipes',   icon: '🍽️' },
-  { id: 'plan',      label: 'Meal Plan', icon: '📅' },
-  { id: 'shopping',  label: 'Shopping',  icon: '🛒' },
-  { id: 'pantry',    label: 'Pantry',    icon: '🫙' },
+const TOP_NAV = [
+  { id: 'dashboard', label: 'This Week' },
+  { id: 'recipes',   label: 'Recipes' },
+  { id: 'plan',      label: 'Plan' },
+  { id: 'shopping',  label: 'Shopping' },
+  { id: 'pantry',    label: 'Pantry' },
 ];
 
-// Bottom nav shows most-used 5 + AI
-const BOTTOM_VIEWS = ['dashboard', 'recipes', 'plan', 'shopping', 'pantry'];
+const MORE_VIEWS = [
+  { id: 'allergens',   label: 'Allergens' },
+  { id: 'history',     label: 'History' },
+  { id: 'firstfoods',  label: 'First foods' },
+  { id: 'collections', label: 'Collections' },
+];
 
-// Sidebar panel SVG icon (two-column layout)
-function IconSidebar() {
+const TAB_BAR = [
+  { id: 'dashboard', label: 'Today',   icon: '◇' },
+  { id: 'recipes',   label: 'Recipes', icon: '◎' },
+  { id: 'plan',      label: 'Plan',    icon: '☰' },
+  { id: 'shopping',  label: 'Shop',    icon: '⌗' },
+  { id: 'menu',      label: 'More',    icon: '···' },
+];
+
+function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settingsHandlers }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="1" y="1" width="5" height="14" rx="1.5" fill="currentColor" opacity="0.9"/>
-      <rect x="8" y="1" width="7" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
-      <rect x="8" y="9" width="7" height="6" rx="1.5" fill="currentColor" opacity="0.5"/>
-    </svg>
+    <header className="glass-topnav">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 22, paddingLeft: 8 }}>
+        <div className="glass-logo">Mealhouse<span className="glass-logo-dot">.</span></div>
+        <nav style={{ display: 'flex', gap: 2 }}>
+          {TOP_NAV.map(item => (
+            <GlassPill
+              key={item.id}
+              active={view === item.id}
+              onClick={() => setView(item.id)}
+            >{item.label}</GlassPill>
+          ))}
+          <GlassPill active={MORE_VIEWS.some(m => m.id === view) || showMoreMenu} onClick={onMoreToggle}>
+            More ▾
+          </GlassPill>
+        </nav>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingRight: 4, position: 'relative' }}>
+        <GlassPill onClick={() => settingsHandlers.openIntegrations()} title="Integrations">🔌</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openLLM()} title="AI model">🤖</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openNtfy()} title="Notifications">🔔</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="Adult goals">💪</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="Child profile">🧒</GlassPill>
+        {showMoreMenu && (
+          <div style={{
+            position: 'absolute', top: '100%', right: 0, marginTop: 10, zIndex: 60,
+            background: 'oklch(1 0 0 / 0.7)',
+            backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+            borderRadius: 16, padding: 6, minWidth: 180,
+            boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.7), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16), 0 12px 32px -10px oklch(0.3 0.04 50 / 0.3)',
+          }}>
+            {MORE_VIEWS.map(v => (
+              <button key={v.id}
+                onClick={() => { setView(v.id); onMore(); }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: view === v.id ? 'oklch(0.62 0.14 35 / 0.15)' : 'transparent',
+                  color: view === v.id ? THEME.accent : THEME.ink,
+                  border: 'none', borderRadius: 10,
+                  padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >{v.label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function GlassTabBar({ view, setView, onMoreOpen }) {
+  return (
+    <nav className="glass-tabbar">
+      {TAB_BAR.map(item => {
+        const active = item.id === 'menu'
+          ? MORE_VIEWS.some(m => m.id === view) || view === 'pantry-extra'
+          : view === item.id;
+        return (
+          <button
+            key={item.id}
+            className={`glass-tabbar-item${active ? ' active' : ''}`}
+            onClick={() => item.id === 'menu' ? onMoreOpen() : setView(item.id)}
+          >
+            <span className="glass-tabbar-indicator" />
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -42,10 +118,11 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [showLLMSettings, setShowLLMSettings] = useState(false);
   const [showNtfySettings, setShowNtfySettings] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(false);
   const [showChildProfile, setShowChildProfile] = useState(false);
   const [showAdultGoals, setShowAdultGoals] = useState(false);
-  const [showIntegrations, setShowIntegrations] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
 
   function showToast(msg, duration = 3000) {
     setToast(msg);
@@ -62,96 +139,68 @@ export default function App() {
       case 'allergens': return <AllergenTracker showToast={showToast} />;
       case 'history':   return <MealHistory />;
       case 'firstfoods':   return <FirstFoodsLog showToast={showToast} />;
-      case 'collections':  return <CollectionsPanel showToast={showToast} onFilterByCollection={(col) => { setView('recipes'); }} />;
+      case 'collections':  return <CollectionsPanel showToast={showToast} onFilterByCollection={() => setView('recipes')} />;
       default:             return null;
     }
   }
 
+  const settingsHandlers = {
+    openLLM:          () => setShowLLMSettings(true),
+    openNtfy:         () => setShowNtfySettings(true),
+    openIntegrations: () => setShowIntegrations(true),
+    openChildProfile: () => setShowChildProfile(true),
+    openAdultGoals:   () => setShowAdultGoals(true),
+  };
+
   return (
     <>
-    <div className="mesh-bg">
-      <div className="mesh-orb mesh-orb-1" />
-      <div className="mesh-orb mesh-orb-2" />
-      <div className="mesh-orb mesh-orb-3" />
-      <div className="mesh-orb mesh-orb-4" />
-    </div>
-    <div className={`layout${sidebarOpen ? '' : ' sidebar-closed'}`}>
-      <nav className={`sidebar${sidebarOpen ? '' : ' sidebar-closed'}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">🥘 Meals</div>
-          <button className="sidebar-collapse-btn" onClick={() => setSidebarOpen(false)} title="Collapse sidebar">
-            <IconSidebar />
-          </button>
-        </div>
+      <div className="mesh-bg" />
+      <div className="layout">
+        <GlassTopNav
+          view={view}
+          setView={(v) => { setView(v); setShowMoreMenu(false); }}
+          showMoreMenu={showMoreMenu}
+          onMoreToggle={() => setShowMoreMenu(v => !v)}
+          onMore={() => setShowMoreMenu(false)}
+          settingsHandlers={settingsHandlers}
+        />
 
-        {VIEWS.map(v => (
-          <button key={v.id} className={`nav-item${view === v.id ? ' active' : ''}`} onClick={() => setView(v.id)}>
-            <span className="nav-emoji">{v.icon}</span>
-            <span>{v.label}</span>
-          </button>
-        ))}
-        <button className={`nav-item${view === 'allergens' ? ' active' : ''}`} onClick={() => setView('allergens')}>
-          <span className="nav-emoji">🧪</span><span>Allergens</span>
-        </button>
-        <button className={`nav-item${view === 'history' ? ' active' : ''}`} onClick={() => setView('history')}>
-          <span className="nav-emoji">📖</span><span>History</span>
-        </button>
-        <button className={`nav-item${view === 'firstfoods' ? ' active' : ''}`} onClick={() => setView('firstfoods')}>
-          <span className="nav-emoji">👶</span><span>First Foods</span>
-        </button>
-        <button className={`nav-item${view === 'collections' ? ' active' : ''}`} onClick={() => setView('collections')}>
-          <span className="nav-emoji">🗂</span><span>Collections</span>
-        </button>
+        <main className="main">{renderView()}</main>
 
-        <div style={{ flex: 1 }} />
-        <div className="sidebar-divider" />
-        <button className="nav-item" onClick={() => setShowAdultGoals(true)}>
-          <span className="nav-emoji">💪</span><span>Adult Goals</span>
-        </button>
-        <button className="nav-item" onClick={() => setShowChildProfile(true)}>
-          <span className="nav-emoji">🧒</span><span>Child Profile</span>
-        </button>
-        <button className="nav-item" onClick={() => setShowNtfySettings(true)}>
-          <span className="nav-emoji">🔔</span><span>Notifications</span>
-        </button>
-        <button className="nav-item" onClick={() => setShowIntegrations(true)}>
-          <span className="nav-emoji">🔌</span><span>Integrations</span>
-        </button>
-        <button className="nav-item" onClick={() => setShowLLMSettings(true)}>
-          <span className="nav-emoji">🤖</span><span>AI Model</span>
-        </button>
-      </nav>
+        <GlassTabBar view={view} setView={setView} onMoreOpen={() => setShowMobileMore(true)} />
 
-      {!sidebarOpen && (
-        <button className="sidebar-expand-btn" onClick={() => setSidebarOpen(true)} title="Open sidebar">
-          <IconSidebar />
-        </button>
-      )}
+        {showMobileMore && (
+          <div className="modal-backdrop" onClick={() => setShowMobileMore(false)}>
+            <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 600, fontStyle: 'italic', color: 'var(--ink)' }}>More</div>
+                <button className="modal-close" onClick={() => setShowMobileMore(false)}>×</button>
+              </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[...MORE_VIEWS, { id: 'pantry', label: 'Pantry' }].map(item => (
+                  <button key={item.id} className="btn-ghost" style={{ textAlign: 'left' }}
+                    onClick={() => { setView(item.id); setShowMobileMore(false); }}>
+                    {item.label}
+                  </button>
+                ))}
+                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowAdultGoals(true); setShowMobileMore(false); }}>💪 Adult goals</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowChildProfile(true); setShowMobileMore(false); }}>🧒 Child profile</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 Notifications</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
+              </div>
+            </div>
+          </div>
+        )}
 
-      <main className="main">{renderView()}</main>
-
-      <nav className="bottom-nav">
-        {BOTTOM_VIEWS.map(id => {
-          const v = VIEWS.find(x => x.id === id);
-          return (
-            <button key={id} className={`bottom-nav-item${view === id ? ' active' : ''}`} onClick={() => setView(id)}>
-              <span className="nav-icon">{v.icon}</span>
-              <span>{v.label}</span>
-            </button>
-          );
-        })}
-        <button className="bottom-nav-item" onClick={() => setShowLLMSettings(true)}>
-          <span className="nav-icon">🤖</span><span>AI</span>
-        </button>
-      </nav>
-
-      {showLLMSettings && <LLMSettings onClose={() => setShowLLMSettings(false)} />}
-      {showNtfySettings && <NtfySettings onClose={() => setShowNtfySettings(false)} showToast={showToast} />}
-      {showIntegrations && <IntegrationsSettings onClose={() => setShowIntegrations(false)} showToast={showToast} />}
-      {showAdultGoals && <AdultGoals onClose={() => setShowAdultGoals(false)} showToast={showToast} />}
-      {showChildProfile && <ChildProfile onClose={() => setShowChildProfile(false)} showToast={showToast} />}
-      {toast && <div className="toast">{toast}</div>}
-    </div>
+        {showLLMSettings && <LLMSettings onClose={() => setShowLLMSettings(false)} />}
+        {showNtfySettings && <NtfySettings onClose={() => setShowNtfySettings(false)} showToast={showToast} />}
+        {showIntegrations && <IntegrationsSettings onClose={() => setShowIntegrations(false)} showToast={showToast} />}
+        {showAdultGoals && <AdultGoals onClose={() => setShowAdultGoals(false)} showToast={showToast} />}
+        {showChildProfile && <ChildProfile onClose={() => setShowChildProfile(false)} showToast={showToast} />}
+        {toast && <div className="toast">{toast}</div>}
+      </div>
     </>
   );
 }
