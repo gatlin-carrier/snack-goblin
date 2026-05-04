@@ -1,0 +1,136 @@
+import { useState, useEffect } from 'react';
+
+export default function CollectionsPanel({ showToast, onFilterByCollection }) {
+  const [collections, setCollections] = useState([]);
+  const [newName, setNewName] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+  const [expandedRecipes, setExpandedRecipes] = useState([]);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    const data = await fetch('/api/collections').then(r => r.json());
+    setCollections(data);
+  }
+
+  async function add() {
+    if (!newName.trim()) return;
+    setAdding(true);
+    try {
+      const res = await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) { const d = await res.json(); showToast(d.error || 'Error'); return; }
+      setNewName('');
+      showToast('Collection created');
+      load();
+    } finally { setAdding(false); }
+  }
+
+  async function remove(col) {
+    await fetch(`/api/collections/${col.id}`, { method: 'DELETE' });
+    setCollections(c => c.filter(x => x.id !== col.id));
+    showToast(`Deleted "${col.name}"`);
+  }
+
+  async function expand(col) {
+    if (expanded === col.id) { setExpanded(null); return; }
+    setExpanded(col.id);
+    const recipes = await fetch(`/api/collections/${col.id}/recipes`).then(r => r.json());
+    setExpandedRecipes(recipes);
+  }
+
+  async function removeFromCollection(colId, recipeId, recipeName) {
+    await fetch(`/api/collections/${colId}/recipes/${recipeId}`, { method: 'DELETE' });
+    setExpandedRecipes(r => r.filter(x => x.id !== recipeId));
+    setCollections(c => c.map(x => x.id === colId ? { ...x, recipe_count: Math.max(0, (x.recipe_count || 1) - 1) } : x));
+    showToast(`Removed "${recipeName}"`);
+  }
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <div className="page-title">Collections</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
+            {collections.length} collection{collections.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Add new collection */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <input
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && add()}
+          placeholder="New collection name…"
+          style={{ flex: 1 }}
+        />
+        <button className="btn-primary" onClick={add} disabled={!newName.trim() || adding}>
+          {adding ? '…' : '+ Create'}
+        </button>
+      </div>
+
+      {collections.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🗂</div>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>No collections yet</div>
+          <div style={{ fontSize: 13 }}>Group recipes by theme — "High Protein", "Kid Favorites", "Date Night", whatever fits your family.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {collections.map(col => (
+            <div key={col.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 22 }}>🗂</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{col.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {col.recipe_count || 0} recipe{col.recipe_count !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                {onFilterByCollection && (
+                  <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }}
+                    onClick={() => onFilterByCollection(col)}>
+                    Browse →
+                  </button>
+                )}
+                <button onClick={() => expand(col)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18, padding: '2px 6px' }}>
+                  {expanded === col.id ? '▲' : '▼'}
+                </button>
+                <button onClick={() => remove(col)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18, padding: '2px 4px' }}>✕</button>
+              </div>
+
+              {expanded === col.id && (
+                <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px 12px' }}>
+                  {expandedRecipes.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 0' }}>
+                      No recipes yet. Open a recipe and use "+ Collection" to add it here.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {expandedRecipes.map(r => (
+                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{r.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{r.cuisine}</div>
+                          <button onClick={() => removeFromCollection(col.id, r.id, r.name)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
