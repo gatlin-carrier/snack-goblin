@@ -9,7 +9,7 @@ const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
 const { chat } = require('./llm');
-const { requireAuth } = require('./auth');
+const { makeRequireAuth, getFounderUserId } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3710;
@@ -36,8 +36,9 @@ app.use('/api', apiLimiter);
 
 // Supabase JWT auth — every /api/* request requires a valid bearer token from
 // an allowlisted Supabase user. Configure via SUPABASE_URL,
-// SUPABASE_PUBLISHABLE_KEY, ALLOWED_EMAILS env vars.
-app.use('/api', requireAuth);
+// SUPABASE_PUBLISHABLE_KEY, ALLOWED_EMAILS env vars. The middleware also
+// auto-claims pre-Phase-1A NULL user_id rows for the founder on first auth.
+// (db is initialized below; we install the middleware after db is ready.)
 
 // ─── Security helpers ─────────────────────────────────────────────────────────
 
@@ -306,6 +307,9 @@ db.exec(`
     fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Install Supabase auth middleware now that db is ready (founder-claim needs db).
+app.use('/api', makeRequireAuth({ db }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -819,11 +823,12 @@ const insertRecipe = db.prepare(`
   INSERT INTO recipes (name, description, meal_type, cuisine, prep_time_min, cook_time_min,
     servings_adult, ingredients, instructions, nutrition, toddler_safe,
     choking_hazards, toddler_notes, batch_prep_notes, oven_temp, tags,
-    cost_per_serving, cost_fetched_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cost_per_serving, cost_fetched_at, user_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
-function saveRecipes(recipes, mealType) {
+function saveRecipes(recipes, mealType, userId = null) {
+  const owner = userId || getFounderUserId();
   let saved = 0;
   const newIds = [];
   for (const r of recipes) {
@@ -845,7 +850,8 @@ function saveRecipes(recipes, mealType) {
         r.oven_temp || null,
         JSON.stringify(r.tags || []),
         cost,
-        cost != null ? new Date().toISOString() : null
+        cost != null ? new Date().toISOString() : null,
+        owner
       );
       newIds.push({ id: result.lastInsertRowid, name: r.name, cuisine: r.cuisine, meal_type: r.meal_type || mealType });
       saved++;
@@ -1143,7 +1149,7 @@ Ingredient categories: produce, dairy, meat, seafood, pantry, frozen, bakery.`;
     if (!match) return res.status(422).json({ error: 'Could not parse recipe from page' });
 
     const recipe = JSON.parse(match[0]);
-    const saved = saveRecipes([recipe], recipe.meal_type || meal_type || 'dinner');
+    const saved = saveRecipes([recipe], recipe.meal_type || meal_type || 'dinner', req.userId);
     const inserted = db.prepare('SELECT * FROM recipes ORDER BY id DESC LIMIT 1').get();
     res.json({ ok: true, saved, recipe: inserted });
   } catch (err) {
@@ -1180,7 +1186,7 @@ app.post('/api/recipes/generate', llmLimiter, async (req, res) => {
     emit({ type: 'start', mealType, count, step: i + 1, totalSteps: steps.length });
     try {
       const recipes = await generateRecipesForType(mealType, count, prefs, topRatedCtx, mode);
-      const generated = saveRecipes(recipes, mealType);
+      const generated = saveRecipes(recipes, mealType, req.userId);
       totalGenerated += generated;
       emit({ type: 'done', mealType, generated, step: i + 1, totalSteps: steps.length });
     } catch (err) {
@@ -1361,7 +1367,7 @@ app.post('/api/collections', (req, res) => {
   try {
     const { name } = req.body;
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name required' });
-    const result = db.prepare('INSERT INTO collections (name) VALUES (?)').run(name.trim().slice(0, 100));
+    const result = db.prepare('INSERT INTO collections (name, user_id) VALUES (?, ?)').run(name.trim().slice(0, 100), req.userId);
     res.json({ id: result.lastInsertRowid, name: name.trim() });
   } catch (err) {
     if (err.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Collection name already exists' });
@@ -1414,9 +1420,9 @@ app.post('/api/preferences', (req, res) => {
     if (!['cuisine', 'ingredient'].includes(type)) return res.status(400).json({ error: 'type must be cuisine or ingredient' });
     if (!['liked', 'disliked', 'excluded'].includes(preference)) return res.status(400).json({ error: 'preference must be liked, disliked, or excluded' });
     db.prepare(`
-      INSERT INTO preferences (type, name, preference) VALUES (?, ?, ?)
+      INSERT INTO preferences (type, name, preference, user_id) VALUES (?, ?, ?, ?)
       ON CONFLICT(type, name) DO UPDATE SET preference = excluded.preference
-    `).run(type, name, preference);
+    `).run(type, name, preference, req.userId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: safeError(err) });
@@ -1440,7 +1446,7 @@ app.get('/api/meal-plans/current', (req, res) => {
     const monday = getMonday(new Date());
     let plan = db.prepare('SELECT * FROM meal_plans WHERE week_start = ?').get(monday);
     if (!plan) {
-      const result = db.prepare("INSERT INTO meal_plans (week_start, status) VALUES (?, 'draft')").run(monday);
+      const result = db.prepare("INSERT INTO meal_plans (week_start, status, user_id) VALUES (?, 'draft', ?)").run(monday, req.userId);
       plan = db.prepare('SELECT * FROM meal_plans WHERE id = ?').get(result.lastInsertRowid);
     }
     const items = db.prepare(`
@@ -1478,7 +1484,7 @@ app.get('/api/meal-plans', (req, res) => {
 app.post('/api/meal-plans', (req, res) => {
   try {
     const { week_start, notes } = req.body;
-    const result = db.prepare("INSERT INTO meal_plans (week_start, status, notes) VALUES (?, 'draft', ?)").run(week_start, notes || null);
+    const result = db.prepare("INSERT INTO meal_plans (week_start, status, notes, user_id) VALUES (?, 'draft', ?, ?)").run(week_start, notes || null, req.userId);
     res.json({ id: result.lastInsertRowid });
   } catch (err) {
     res.status(500).json({ error: safeError(err) });
@@ -1773,7 +1779,7 @@ app.post('/api/plan-templates', (req, res) => {
     const items = db.prepare('SELECT recipe_id, meal_type, day_of_week, servings_adult, servings_toddler FROM meal_plan_items WHERE meal_plan_id = ? AND COALESCE(is_alternate, 0) = 0').all(plan_id);
     if (!items.length) return res.status(400).json({ error: 'Plan has no meals to save' });
 
-    const result = db.prepare('INSERT INTO plan_templates (name) VALUES (?)').run(name.trim().slice(0, 100));
+    const result = db.prepare('INSERT INTO plan_templates (name, user_id) VALUES (?, ?)').run(name.trim().slice(0, 100), req.userId);
     const templateId = result.lastInsertRowid;
     const insertItem = db.prepare('INSERT INTO plan_template_items (template_id, recipe_id, meal_type, day_of_week, servings_adult, servings_toddler) VALUES (?, ?, ?, ?, ?, ?)');
     db.transaction(() => {
@@ -1804,7 +1810,7 @@ app.post('/api/meal-plans/from-template/:id', (req, res) => {
     })();
     let plan = db.prepare('SELECT * FROM meal_plans WHERE week_start = ?').get(monday);
     if (!plan) {
-      const r = db.prepare("INSERT INTO meal_plans (week_start, status) VALUES (?, 'draft')").run(monday);
+      const r = db.prepare("INSERT INTO meal_plans (week_start, status, user_id) VALUES (?, 'draft', ?)").run(monday, req.userId);
       plan = db.prepare('SELECT * FROM meal_plans WHERE id = ?').get(r.lastInsertRowid);
     }
     // Clear existing items first
@@ -1850,7 +1856,7 @@ app.post('/api/shopping-lists', (req, res) => {
       }
     }
 
-    const result = db.prepare("INSERT INTO shopping_lists (meal_plan_id, status) VALUES (?, 'pending')").run(meal_plan_id);
+    const result = db.prepare("INSERT INTO shopping_lists (meal_plan_id, status, user_id) VALUES (?, 'pending', ?)").run(meal_plan_id, req.userId);
     const listId = result.lastInsertRowid;
     const insertItem = db.prepare('INSERT INTO shopping_list_items (shopping_list_id, ingredient_name, quantity, unit, category) VALUES (?, ?, ?, ?, ?)');
     const CATEGORY_ORDER = ['produce', 'meat', 'seafood', 'dairy', 'frozen', 'bakery', 'pantry'];
@@ -1995,7 +2001,7 @@ app.get('/api/pantry', (req, res) => res.json(db.prepare('SELECT * FROM pantry_i
 app.post('/api/pantry', (req, res) => {
   try {
     const { ingredient_name, quantity, unit, category, notes } = req.body;
-    const result = db.prepare(`INSERT INTO pantry_items (ingredient_name, quantity, unit, category, notes) VALUES (?, ?, ?, ?, ?) ON CONFLICT(ingredient_name) DO UPDATE SET quantity=excluded.quantity, unit=excluded.unit, category=excluded.category, notes=excluded.notes, updated_at=CURRENT_TIMESTAMP`).run(ingredient_name, quantity || null, unit || null, category || 'pantry', notes || null);
+    const result = db.prepare(`INSERT INTO pantry_items (ingredient_name, quantity, unit, category, notes, user_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(ingredient_name) DO UPDATE SET quantity=excluded.quantity, unit=excluded.unit, category=excluded.category, notes=excluded.notes, updated_at=CURRENT_TIMESTAMP`).run(ingredient_name, quantity || null, unit || null, category || 'pantry', notes || null, req.userId);
     res.json({ id: result.lastInsertRowid });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2018,7 +2024,7 @@ app.post('/api/equipment', (req, res) => {
   try {
     const { name, notes } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
-    const result = db.prepare('INSERT INTO equipment (name, notes) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET notes=excluded.notes, updated_at=CURRENT_TIMESTAMP').run(name.trim(), notes || null);
+    const result = db.prepare('INSERT INTO equipment (name, notes, user_id) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET notes=excluded.notes, updated_at=CURRENT_TIMESTAMP').run(name.trim(), notes || null, req.userId);
     res.json({ id: result.lastInsertRowid, name: name.trim(), notes: notes || null });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2048,10 +2054,10 @@ app.post('/api/allergens', (req, res) => {
   try {
     const { allergen, status, first_introduced_date, reaction, notes } = req.body;
     if (!ALLERGENS.includes(allergen)) return res.status(400).json({ error: 'Unknown allergen' });
-    db.prepare(`INSERT INTO allergen_exposures (allergen, status, first_introduced_date, reaction, notes, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    db.prepare(`INSERT INTO allergen_exposures (allergen, status, first_introduced_date, reaction, notes, updated_at, user_id)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
       ON CONFLICT(allergen) DO UPDATE SET status=excluded.status, first_introduced_date=COALESCE(excluded.first_introduced_date, first_introduced_date), reaction=excluded.reaction, notes=excluded.notes, updated_at=CURRENT_TIMESTAMP`)
-      .run(allergen, status || 'introduced', first_introduced_date || new Date().toISOString().slice(0,10), reaction || null, notes || null);
+      .run(allergen, status || 'introduced', first_introduced_date || new Date().toISOString().slice(0,10), reaction || null, notes || null, req.userId);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2068,7 +2074,7 @@ app.post('/api/recipes/:id/cooked', (req, res) => {
     const id = req.params.id;
     const recipe = db.prepare('SELECT id FROM recipes WHERE id = ?').get(id);
     if (!recipe) return res.status(404).json({ error: 'Not found' });
-    db.prepare('INSERT INTO cook_log (recipe_id, notes) VALUES (?, ?)').run(id, req.body.notes || null);
+    db.prepare('INSERT INTO cook_log (recipe_id, notes, user_id) VALUES (?, ?, ?)').run(id, req.body.notes || null, req.userId);
     db.prepare('UPDATE recipes SET cook_count = cook_count + 1, last_cooked_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
@@ -2491,8 +2497,8 @@ app.post('/api/freezer', (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const defaultUseBy = new Date(); defaultUseBy.setMonth(defaultUseBy.getMonth() + 3);
     const result = db.prepare(
-      'INSERT INTO freezer_items (recipe_name, servings, frozen_date, use_by_date, notes) VALUES (?, ?, ?, ?, ?)'
-    ).run(recipe_name.trim(), servings || 2, frozen_date || today, use_by_date || defaultUseBy.toISOString().slice(0, 10), notes || null);
+      'INSERT INTO freezer_items (recipe_name, servings, frozen_date, use_by_date, notes, user_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(recipe_name.trim(), servings || 2, frozen_date || today, use_by_date || defaultUseBy.toISOString().slice(0, 10), notes || null, req.userId);
     res.json(db.prepare('SELECT * FROM freezer_items WHERE id = ?').get(result.lastInsertRowid));
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2515,8 +2521,8 @@ app.post('/api/leftovers', (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const defaultUseBy = new Date(); defaultUseBy.setDate(defaultUseBy.getDate() + 4);
     const result = db.prepare(
-      'INSERT INTO leftovers (recipe_name, servings_remaining, cooked_date, use_by_date, notes) VALUES (?, ?, ?, ?, ?)'
-    ).run(recipe_name.trim(), servings_remaining || 2, cooked_date || today, use_by_date || defaultUseBy.toISOString().slice(0, 10), notes || null);
+      'INSERT INTO leftovers (recipe_name, servings_remaining, cooked_date, use_by_date, notes, user_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(recipe_name.trim(), servings_remaining || 2, cooked_date || today, use_by_date || defaultUseBy.toISOString().slice(0, 10), notes || null, req.userId);
     res.json(db.prepare('SELECT * FROM leftovers WHERE id = ?').get(result.lastInsertRowid));
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2550,8 +2556,8 @@ app.post('/api/first-foods', (req, res) => {
     if (!food_name?.trim()) return res.status(400).json({ error: 'food_name required' });
     const today = new Date().toISOString().slice(0, 10);
     const result = db.prepare(
-      'INSERT INTO first_foods (food_name, date_tried, reaction, notes) VALUES (?, ?, ?, ?)'
-    ).run(food_name.trim(), date_tried || today, reaction || 'none', notes || null);
+      'INSERT INTO first_foods (food_name, date_tried, reaction, notes, user_id) VALUES (?, ?, ?, ?, ?)'
+    ).run(food_name.trim(), date_tried || today, reaction || 'none', notes || null, req.userId);
     res.json(db.prepare('SELECT * FROM first_foods WHERE id = ?').get(result.lastInsertRowid));
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });

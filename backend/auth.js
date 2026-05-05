@@ -17,30 +17,70 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
   : null;
 
-async function requireAuth(req, res, next) {
-  if (!supabase) return res.status(503).json({ error: 'Auth not configured on server' });
+// Founder is the first allowlisted email. Their first authed request claims
+// any pre-existing NULL user_id rows. Idempotent — subsequent requests no-op.
+const FOUNDER_EMAIL = ALLOWED[0] || null;
+let claimedForUserId = null;
 
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'Missing bearer token' });
+const SCOPED_TABLES = [
+  'recipes', 'meal_plans', 'shopping_lists', 'pantry_items', 'equipment',
+  'preferences', 'allergen_exposures', 'cook_log', 'freezer_items',
+  'leftovers', 'first_foods', 'collections', 'plan_templates',
+];
 
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) return res.status(401).json({ error: 'Invalid or expired session' });
-
-    const email = (data.user.email || '').toLowerCase();
-    if (ALLOWED.length > 0 && !ALLOWED.includes(email)) {
-      console.warn(`[auth] denied non-allowlisted email: ${email}`);
-      return res.status(403).json({ error: 'This account is not authorized for this app' });
+function claimFounderData(db, userId) {
+  if (claimedForUserId === userId) return;
+  let total = 0;
+  for (const table of SCOPED_TABLES) {
+    try {
+      const r = db.prepare(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL`).run(userId);
+      total += r.changes;
+    } catch (err) {
+      console.warn(`[auth] claim failed on ${table}:`, err.message);
     }
-
-    req.user = data.user;
-    req.userId = data.user.id;
-    next();
-  } catch (err) {
-    console.error('[auth] verification error:', err.message);
-    res.status(500).json({ error: 'Auth verification failed' });
   }
+  claimedForUserId = userId;
+  if (total > 0) console.log(`[auth] founder ${userId} claimed ${total} pre-existing rows`);
 }
 
-module.exports = { requireAuth };
+function makeRequireAuth({ db } = {}) {
+  return async function requireAuth(req, res, next) {
+    if (!supabase) return res.status(503).json({ error: 'Auth not configured on server' });
+
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing bearer token' });
+
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data?.user) return res.status(401).json({ error: 'Invalid or expired session' });
+
+      const email = (data.user.email || '').toLowerCase();
+      if (ALLOWED.length > 0 && !ALLOWED.includes(email)) {
+        console.warn(`[auth] denied non-allowlisted email: ${email}`);
+        return res.status(403).json({ error: 'This account is not authorized for this app' });
+      }
+
+      req.user = data.user;
+      req.userId = data.user.id;
+
+      if (db && FOUNDER_EMAIL && email === FOUNDER_EMAIL) {
+        claimFounderData(db, data.user.id);
+      }
+
+      next();
+    } catch (err) {
+      console.error('[auth] verification error:', err.message);
+      res.status(500).json({ error: 'Auth verification failed' });
+    }
+  };
+}
+
+// Backwards-compat default export — unscoped (no claim). Prefer makeRequireAuth({db}).
+const requireAuth = makeRequireAuth();
+
+function getFounderUserId() {
+  return claimedForUserId;
+}
+
+module.exports = { requireAuth, makeRequireAuth, getFounderUserId };
