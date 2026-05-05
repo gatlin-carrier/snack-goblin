@@ -133,14 +133,16 @@ export default function Login() {
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{
               fontSize: 11, color: THEME.accent, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8,
-            }}>Welcome back</div>
+              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10,
+            }}>welcome to the den</div>
+            <div style={{ fontSize: 48, lineHeight: 1, marginBottom: 8 }}>👹</div>
             <div style={{
               fontFamily: display, fontSize: 44, fontWeight: 400, fontStyle: 'italic',
               color: THEME.ink, lineHeight: 1, letterSpacing: '-0.02em',
-            }}>Mealhouse<span style={{ color: THEME.accent }}>.</span></div>
-            <div style={{ color: THEME.dim, fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
-              Sign in to plan the family's week.
+            }}>Snack Goblins</div>
+            <div style={{ color: THEME.dim, fontSize: 14, marginTop: 14, lineHeight: 1.55 }}>
+              Dinner planning for ADHD brains.<br />
+              <span style={{ color: THEME.faint }}>Sign in and we'll figure out food together.</span>
             </div>
           </div>
 
@@ -235,7 +237,7 @@ export default function Login() {
             textAlign: 'center', marginTop: 22,
             fontSize: 11, color: THEME.faint, lineHeight: 1.6, letterSpacing: '0.02em',
           }}>
-            This is a private, family-use app. Access is by invitation only.
+            Built for our weird little family. Access by invitation only.
           </div>
         </div>
       </div>

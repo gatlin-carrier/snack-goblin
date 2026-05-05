@@ -44,7 +44,10 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
   return (
     <header className="glass-topnav">
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, paddingLeft: 8 }}>
-        <div className="glass-logo">Mealhouse<span className="glass-logo-dot">.</span></div>
+        <div className="glass-logo">
+          <span style={{ marginRight: 6, filter: 'saturate(1.15)' }}>👹</span>
+          Snack Goblins
+        </div>
         <nav style={{ display: 'flex', gap: 2 }}>
           {TOP_NAV.map(item => (
             <GlassPill

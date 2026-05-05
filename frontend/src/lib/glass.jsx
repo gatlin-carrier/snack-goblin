@@ -1,4 +1,4 @@
-// Mealhouse — Liquid Glass primitives.
+// Snack Goblins — Liquid Glass primitives.
 // Apple iOS 26-style translucent surfaces: blurred + saturated backdrop,
 // hairline ring, top inner highlight, soft drop shadow. All warm-light.
 
