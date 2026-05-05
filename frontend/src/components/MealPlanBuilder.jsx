@@ -83,6 +83,18 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
     loadPlan();
   }
 
+  async function forgiveItem(item) {
+    await fetch(`/api/meal-plans/${plan.id}/items/${item.id}/forgive`, { method: 'POST' });
+    showToast(`forgiven. no shame, moving on.`);
+    loadPlan();
+  }
+
+  async function unforgiveItem(item) {
+    await fetch(`/api/meal-plans/${plan.id}/items/${item.id}/unforgive`, { method: 'POST' });
+    showToast(`back on the menu`);
+    loadPlan();
+  }
+
   async function assignSlot(item, day, mealType) {
     await fetch(`/api/meal-plans/${plan.id}/items/${item.id}`, {
       method: 'PUT',
@@ -336,11 +348,16 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                             textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6,
                           }}>{slot.label}</div>
                           {meal ? (
-                            <div>
+                            <div style={{ opacity: meal.skipped ? 0.4 : 1, transition: 'opacity 200ms ease' }}>
                               <div style={{
                                 fontWeight: 600, fontSize: isToday ? 15 : 13,
                                 lineHeight: 1.3, marginBottom: 4, color: THEME.ink,
-                              }}>{meal.name}</div>
+                                textDecoration: meal.skipped ? 'line-through' : 'none',
+                                textDecorationColor: THEME.faint,
+                              }}>
+                                {meal.name}
+                                {meal.skipped && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: THEME.sage, letterSpacing: '0.08em', textTransform: 'uppercase', textDecoration: 'none' }}>· forgiven</span>}
+                              </div>
                               <div style={{ fontSize: 11, color: THEME.dim, display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: isToday ? 8 : 0 }}>
                                 <span>{meal.cuisine}</span>
                                 <span style={{ color: THEME.faint }}>·</span>
@@ -371,10 +388,15 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                                   </div>
                                 </div>
                               )}
-                              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                                 <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} onClick={() => setSelected(meal)}>View</button>
-                                {alternates.length > 0 && (
+                                {alternates.length > 0 && !meal.skipped && (
                                   <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} onClick={() => setSwapFromId(swapFromId === meal.id ? null : meal.id)}>🔄 Swap</button>
+                                )}
+                                {meal.skipped ? (
+                                  <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px', color: THEME.sage }} onClick={() => unforgiveItem(meal)}>↩ undo</button>
+                                ) : (
+                                  <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px' }} title="not making this — no shame" onClick={() => forgiveItem(meal)}>🤍 forgive</button>
                                 )}
                                 <button style={{ ...glassBtnGhost, fontSize: 11, padding: '4px 12px', color: THEME.red }} onClick={() => removeItem(meal)}>✕</button>
                               </div>
@@ -491,21 +513,26 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
             primaries.map(item => {
               const slot = SLOT_BY_KEY[item.meal_type];
               return (
-                <Glass key={item.id} padding={14} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <Badge tone={slot?.tone || 'neutral'}>{item.meal_type}</Badge>
+                <Glass key={item.id} padding={14} style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: item.skipped ? 0.45 : 1 }}>
+                  <Badge tone={item.skipped ? 'sage' : (slot?.tone || 'neutral')}>{item.skipped ? 'forgiven' : item.meal_type}</Badge>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: THEME.ink }}>{item.name}</div>
+                    <div style={{ fontWeight: 600, color: THEME.ink, textDecoration: item.skipped ? 'line-through' : 'none', textDecorationColor: THEME.faint }}>{item.name}</div>
                     <div style={{ fontSize: 12, color: THEME.dim }}>
                       {item.cuisine}
                       {item.day_of_week != null ? ` · ${DAYS[item.day_of_week]}` : ' · Unscheduled'}
                       {item.cost_per_serving != null && ` · $${item.cost_per_serving.toFixed(0)}/serving`}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {alternates.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {alternates.length > 0 && !item.skipped && (
                       <button style={{ ...glassBtnGhost, fontSize: 12 }} onClick={() => setSwapFromId(swapFromId === item.id ? null : item.id)}>🔄 Swap</button>
                     )}
                     <button style={{ ...glassBtnGhost, fontSize: 12 }} onClick={() => setSelected(item)}>View</button>
+                    {item.skipped ? (
+                      <button style={{ ...glassBtnGhost, fontSize: 12, color: THEME.sage }} onClick={() => unforgiveItem(item)}>↩ undo</button>
+                    ) : (
+                      <button style={{ ...glassBtnGhost, fontSize: 12 }} title="not making this — no shame" onClick={() => forgiveItem(item)}>🤍 Forgive</button>
+                    )}
                     <button style={{ ...glassBtnGhost, fontSize: 12, color: THEME.red }} onClick={() => removeItem(item)}>Remove</button>
                   </div>
                 </Glass>

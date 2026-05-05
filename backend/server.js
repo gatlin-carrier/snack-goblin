@@ -293,6 +293,8 @@ const migrations = [
   "ALTER TABLE first_foods ADD COLUMN user_id TEXT",
   "ALTER TABLE collections ADD COLUMN user_id TEXT",
   "ALTER TABLE plan_templates ADD COLUMN user_id TEXT",
+  // Phase C/D — Snack Goblins ADHD features
+  "ALTER TABLE meal_plan_items ADD COLUMN skipped INTEGER DEFAULT 0",
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch {}
@@ -305,6 +307,18 @@ db.exec(`
     unit TEXT NOT NULL,
     source TEXT,
     fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id TEXT PRIMARY KEY,
+    energy_level TEXT DEFAULT 'mid',
+    low_capacity_mode INTEGER DEFAULT 0,
+    onboarding_complete INTEGER DEFAULT 0,
+    last_mood TEXT,
+    last_mood_at DATE,
+    excluded_cuisines TEXT,
+    comfort_meal_type TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -1546,12 +1560,19 @@ app.post('/api/meal-plans/:id/auto-curate', (req, res) => {
     const mealType = req.body.meal_type || 'dinner';
     const altCount = clampInt(req.body.alternates, 0, 20, 8);
 
+    // Energy-aware filter — low: ≤25 min total, mid: ≤45 min, high: no cap
+    const prefs = getUserPrefs(req.userId);
+    const effectiveEnergy = prefs.low_capacity_mode ? 'low' : (prefs.energy_level || 'mid');
+    const maxTotalMin = req.body.max_total_min ?? (effectiveEnergy === 'low' ? 25 : effectiveEnergy === 'mid' ? 45 : 9999);
+
     const candidates = db.prepare(`
-      SELECT id, name, ingredients, star_rating, rating_count, cost_per_serving, last_used
+      SELECT id, name, ingredients, star_rating, rating_count, cost_per_serving, last_used,
+             COALESCE(prep_time_min, 0) + COALESCE(cook_time_min, 0) as total_min
       FROM recipes
       WHERE in_rotation = 1 AND meal_type = ?
+        AND (COALESCE(prep_time_min, 0) + COALESCE(cook_time_min, 0)) <= ?
       ORDER BY (star_rating * COALESCE(rating_count, 0)) DESC, last_used ASC NULLS FIRST
-    `).all(mealType);
+    `).all(mealType, maxTotalMin);
 
     if (candidates.length === 0) {
       return res.status(400).json({ error: 'No recipes available — generate some first' });
@@ -2377,6 +2398,82 @@ app.post('/api/child-profile', (req, res) => {
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
 
+// ─── Routes: User Prefs (per-user ADHD/mood settings) ────────────────────────
+
+const PREF_DEFAULTS = {
+  energy_level: 'mid',
+  low_capacity_mode: 0,
+  onboarding_complete: 0,
+  last_mood: null,
+  last_mood_at: null,
+  excluded_cuisines: '[]',
+  comfort_meal_type: null,
+};
+
+function getUserPrefs(userId) {
+  if (!userId) return { ...PREF_DEFAULTS };
+  let row = db.prepare('SELECT * FROM user_prefs WHERE user_id = ?').get(userId);
+  if (!row) {
+    db.prepare('INSERT INTO user_prefs (user_id) VALUES (?)').run(userId);
+    row = db.prepare('SELECT * FROM user_prefs WHERE user_id = ?').get(userId);
+  }
+  return {
+    energy_level: row.energy_level || 'mid',
+    low_capacity_mode: !!row.low_capacity_mode,
+    onboarding_complete: !!row.onboarding_complete,
+    last_mood: row.last_mood,
+    last_mood_at: row.last_mood_at,
+    excluded_cuisines: (() => { try { return JSON.parse(row.excluded_cuisines || '[]'); } catch { return []; } })(),
+    comfort_meal_type: row.comfort_meal_type,
+  };
+}
+
+app.get('/api/user-prefs', (req, res) => {
+  res.json(getUserPrefs(req.userId));
+});
+
+const PREF_ALLOWED = new Set([
+  'energy_level', 'low_capacity_mode', 'onboarding_complete',
+  'last_mood', 'last_mood_at', 'excluded_cuisines', 'comfort_meal_type',
+]);
+
+app.post('/api/user-prefs', (req, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'no user' });
+  // Ensure row exists
+  db.prepare('INSERT OR IGNORE INTO user_prefs (user_id) VALUES (?)').run(req.userId);
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(req.body || {})) {
+    if (!PREF_ALLOWED.has(k)) continue;
+    sets.push(`${k} = ?`);
+    if (k === 'excluded_cuisines') vals.push(typeof v === 'string' ? v : JSON.stringify(v || []));
+    else if (k === 'low_capacity_mode' || k === 'onboarding_complete') vals.push(v ? 1 : 0);
+    else vals.push(v == null ? null : String(v));
+  }
+  if (!sets.length) return res.json(getUserPrefs(req.userId));
+
+  vals.push(req.userId);
+  db.prepare(`UPDATE user_prefs SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`).run(...vals);
+  res.json(getUserPrefs(req.userId));
+});
+
+// Forgive a meal slot — set skipped=1 instead of deleting. The slot stays
+// visible (greyed) and doesn't accumulate as a "missed" meal anywhere.
+app.post('/api/meal-plans/:planId/items/:itemId/forgive', (req, res) => {
+  const { planId, itemId } = req.params;
+  const r = db.prepare('UPDATE meal_plan_items SET skipped = 1 WHERE id = ? AND meal_plan_id = ?').run(itemId, planId);
+  if (r.changes === 0) return res.status(404).json({ error: 'not found' });
+  res.json({ ok: true });
+});
+
+app.post('/api/meal-plans/:planId/items/:itemId/unforgive', (req, res) => {
+  const { planId, itemId } = req.params;
+  const r = db.prepare('UPDATE meal_plan_items SET skipped = 0 WHERE id = ? AND meal_plan_id = ?').run(itemId, planId);
+  if (r.changes === 0) return res.status(404).json({ error: 'not found' });
+  res.json({ ok: true });
+});
+
 // ─── Routes: Settings ─────────────────────────────────────────────────────────
 
 app.get('/api/settings', (req, res) => {
@@ -2593,8 +2690,24 @@ app.post('/api/adult-goals', (req, res) => {
 
 // ─── Routes: Batch Prep Streak ────────────────────────────────────────────────
 
+// Cooks-this-month, cooks-this-year. Reframed from streak math: we count
+// positive activity, never break a "streak". This matches the brand voice —
+// no shame accumulation, no consecutive-days panic. (The legacy `streak`
+// field is preserved in the response for compatibility but is no longer
+// surfaced in the UI.)
 app.get('/api/batch-streak', (_req, res) => {
   try {
+    const monthCount = db.prepare(
+      "SELECT COUNT(*) as c FROM cook_log WHERE cooked_at >= datetime('now', 'start of month')"
+    ).get()?.c || 0;
+    const yearCount = db.prepare(
+      "SELECT COUNT(*) as c FROM cook_log WHERE cooked_at >= datetime('now', 'start of year')"
+    ).get()?.c || 0;
+    const last30 = db.prepare(
+      "SELECT COUNT(*) as c FROM cook_log WHERE cooked_at >= datetime('now', '-30 days')"
+    ).get()?.c || 0;
+
+    // Legacy compat: keep computing the old streak so callers don't break.
     const plans = db.prepare(`
       SELECT mp.week_start, COUNT(mpi.id) as meal_count, mp.status
       FROM meal_plans mp
@@ -2603,7 +2716,7 @@ app.get('/api/batch-streak', (_req, res) => {
       ORDER BY mp.week_start DESC
     `).all();
 
-    if (!plans.length) return res.json({ streak: 0, best: 0 });
+    if (!plans.length) return res.json({ streak: 0, best: 0, month_count: monthCount, year_count: yearCount, last_30_days: last30 });
 
     let streak = 0, best = 0, prevWeek = null;
     for (const plan of plans) {

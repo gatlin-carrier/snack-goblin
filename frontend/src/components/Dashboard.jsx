@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import CookMode from './CookMode.jsx';
+import EnergyPill from './EnergyPill.jsx';
 import { Glass, Badge, NutritionBar, PhotoBg, glassBtnPrimary, glassBtnGhost, THEME, display } from '../lib/glass.jsx';
+import { usePrefs } from '../lib/prefs.jsx';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -12,14 +14,16 @@ function fmtTimeSaved(min) {
 }
 
 export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, showToast }) {
+  const { prefs } = usePrefs();
   const [nutrition, setNutrition] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cookingRecipe, setCookingRecipe] = useState(null);
   const [leftovers, setLeftovers] = useState([]);
-  const [streak, setStreak] = useState(0);
+  const [monthCount, setMonthCount] = useState(0);
   const [adultGoals, setAdultGoals] = useState(null);
   const [cost, setCost] = useState(null);
+  const [pickingForMe, setPickingForMe] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 700);
 
   useEffect(() => {
@@ -46,7 +50,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
       setHistory(hist);
       setLeftovers(await leftRes.json());
       const streakData = await streakRes.json();
-      setStreak(streakData.streak || 0);
+      setMonthCount(streakData.month_count || 0);
       setAdultGoals(await goalsRes.json());
       if (plan?.id) {
         const [nutData, costData] = await Promise.all([
@@ -93,20 +97,64 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
     days_until_expiry: Math.max(0, Math.ceil((new Date(l.use_by_date) - new Date()) / 86400000)),
   }));
 
-  // Nutrition warnings → calmer messaging
+  // Nutrition warnings → calmer messaging. On low-capacity days, hide
+  // entirely — no nudging on a rough day.
   let calciumNote = null;
-  if (nutrition?.pct?.calcium_mg < 75) calciumNote = "Calcium running low — yogurt-pasta swap can fix.";
-  else if (nutrition?.pct?.dha_mg < 50) calciumNote = "DHA low — add a salmon meal this week.";
-  else if (nutrition?.pct?.iron_mg < 50) calciumNote = "Iron low — add red meat or lentils.";
+  if (!prefs.low_capacity_mode) {
+    if (nutrition?.pct?.calcium_mg < 75) calciumNote = "calcium's a bit low. yogurt-pasta swap can patch it.";
+    else if (nutrition?.pct?.dha_mg < 50) calciumNote = "DHA running low. one salmon meal this week would do it.";
+    else if (nutrition?.pct?.iron_mg < 50) calciumNote = "iron's a bit low. red meat or lentils when you can.";
+  }
+
+  async function pickForMe() {
+    if (!currentPlan?.id || pickingForMe) return;
+    setPickingForMe(true);
+    try {
+      const res = await fetch(`/api/meal-plans/${currentPlan.id}/auto-curate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strategy: 'overlap', days: 5, alternates: 6 }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "couldn't pick"); return; }
+      const energyLabel = prefs.low_capacity_mode ? 'low-energy' : (prefs.energy_level === 'high' ? 'ambitious' : prefs.energy_level === 'low' ? 'low-energy' : 'easy-ish');
+      showToast(`picked ${data.picked} ${energyLabel} meals for you`);
+      await loadData();
+    } finally { setPickingForMe(false); }
+  }
 
   if (cookingRecipe) {
     return <CookMode recipe={cookingRecipe} onClose={() => setCookingRecipe(null)} />;
   }
 
+  const lowCap = prefs.low_capacity_mode;
+
   // ───────── DESKTOP ─────────
   if (!isMobile) {
     return (
       <div className="page">
+        {/* Energy / pick-for-me bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 22, flexWrap: 'wrap', paddingLeft: 8 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: THEME.dim, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>energy</span>
+            <EnergyPill />
+            {lowCap && (
+              <span style={{ fontSize: 11, color: THEME.sage, fontWeight: 700, letterSpacing: '0.08em' }}>🌿 low-capacity day</span>
+            )}
+          </div>
+          <button
+            onClick={pickForMe}
+            disabled={pickingForMe}
+            style={{
+              ...glassBtnPrimary,
+              padding: '10px 22px', fontSize: 14,
+              opacity: pickingForMe ? 0.6 : 1,
+            }}
+          >
+            {pickingForMe ? 'thinking…' : "👹 just pick for me"}
+          </button>
+        </div>
+
         {/* Headline + time-saved */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 24, marginBottom: 28, alignItems: 'flex-end' }}>
           <div style={{ paddingLeft: 8 }}>
@@ -152,7 +200,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
             <div style={{ fontSize: 12, color: THEME.dim, marginTop: 8, lineHeight: 1.5 }}>
               vs cooking everything fresh.{' '}
               <b style={{ color: THEME.ink }}>
-                {planSize} {planSize === 1 ? 'meal' : 'meals'} planned{streak > 0 ? ` · ${streak}-week streak 🔥` : ''}.
+                {planSize} {planSize === 1 ? 'meal' : 'meals'} planned{!prefs.low_capacity_mode && monthCount > 0 ? ` · ${monthCount} ${monthCount === 1 ? 'cook' : 'cooks'} this month` : ''}.
               </b>
             </div>
           </Glass>
@@ -288,7 +336,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
             )}
             {calciumNote && (
               <Glass radius={14} padding={'12px 14px'} tint="oklch(0.68 0.13 80 / 0.18)" style={{ marginTop: 22, fontSize: 13, color: THEME.ink, lineHeight: 1.5 }}>
-                <b>Heads up.</b> {calciumNote}
+                <b>just noticing.</b> {calciumNote}
               </Glass>
             )}
           </Glass>
@@ -357,8 +405,20 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   // ───────── MOBILE ─────────
   return (
     <div className="page">
+      {/* Energy + pick-for-me */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 18, paddingLeft: 4 }}>
+        <EnergyPill compact />
+        <button
+          onClick={pickForMe}
+          disabled={pickingForMe}
+          style={{ ...glassBtnPrimary, fontSize: 12, padding: '7px 14px', opacity: pickingForMe ? 0.6 : 1 }}
+        >
+          {pickingForMe ? '…' : '👹 pick for me'}
+        </button>
+      </div>
+
       <div style={{ fontSize: 10, color: THEME.accent, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
-        {DAY_LONG[todayIdx]} · this week
+        {DAY_LONG[todayIdx]} · this week{lowCap ? ' · 🌿 low-capacity' : ''}
       </div>
       {tonight ? (
         <h1 style={{ fontFamily: display, fontSize: 28, fontWeight: 500, color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0, marginBottom: 16, paddingLeft: 4 }}>

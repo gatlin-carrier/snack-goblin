@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard.jsx';
 import RecipeBrowser from './components/RecipeBrowser.jsx';
 import MealPlanBuilder from './components/MealPlanBuilder.jsx';
@@ -15,7 +15,10 @@ import FirstFoodsLog from './components/FirstFoodsLog.jsx';
 import CollectionsPanel from './components/CollectionsPanel.jsx';
 import { GlassPill, THEME } from './lib/glass.jsx';
 import { useAuth } from './lib/auth.jsx';
+import { usePrefs } from './lib/prefs.jsx';
 import Login from './components/Login.jsx';
+import Onboarding from './components/Onboarding.jsx';
+import MoodCheckIn from './components/MoodCheckIn.jsx';
 
 const TOP_NAV = [
   { id: 'dashboard', label: 'This Week' },
@@ -120,6 +123,7 @@ function GlassTabBar({ view, setView, onMoreOpen }) {
 
 export default function App() {
   const { loading, session, signOut } = useAuth();
+  const { prefs, loaded: prefsLoaded, update: updatePrefs } = usePrefs();
   const [view, setView] = useState('dashboard');
   const [currentPlan, setCurrentPlan] = useState(null);
   const [toast, setToast] = useState(null);
@@ -130,6 +134,23 @@ export default function App() {
   const [showAdultGoals, setShowAdultGoals] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showMood, setShowMood] = useState(false);
+
+  // Mood check-in: once per day on first dashboard visit, only after onboarding
+  useEffect(() => {
+    if (!session || !prefsLoaded) return;
+    if (!prefs.onboarding_complete) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (prefs.last_mood_at === today) return;
+    if (sessionStorage.getItem('mood_skipped_today') === today) return;
+    const t = setTimeout(() => setShowMood(true), 1500);
+    return () => clearTimeout(t);
+  }, [session, prefsLoaded, prefs.onboarding_complete, prefs.last_mood_at]);
+
+  function dismissMood() {
+    sessionStorage.setItem('mood_skipped_today', new Date().toISOString().slice(0, 10));
+    setShowMood(false);
+  }
 
   if (loading) {
     return (
@@ -145,6 +166,17 @@ export default function App() {
     );
   }
   if (!session) return <Login />;
+
+  // First-run onboarding gate. Once prefs load, if onboarding hasn't been
+  // completed (or skipped), block the app behind the onboarding ritual.
+  if (prefsLoaded && !prefs.onboarding_complete) {
+    return (
+      <>
+        <div className="mesh-bg" />
+        <Onboarding onDone={() => {/* prefs update triggers re-render */}} />
+      </>
+    );
+  }
 
   function showToast(msg, duration = 3000) {
     setToast(msg);
@@ -213,6 +245,18 @@ export default function App() {
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
                 <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <button
+                  className="btn-ghost"
+                  style={{
+                    textAlign: 'left',
+                    background: prefs.low_capacity_mode ? 'oklch(0.78 0.07 145 / 0.18)' : undefined,
+                    color: prefs.low_capacity_mode ? THEME.sage : undefined,
+                  }}
+                  onClick={() => updatePrefs({ low_capacity_mode: !prefs.low_capacity_mode })}
+                >
+                  {prefs.low_capacity_mode ? '🌿 low-capacity day · on' : '🌿 low-capacity day · off'}
+                </button>
+                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { signOut(); setShowMobileMore(false); }}>↪ Sign out</button>
               </div>
             </div>
@@ -224,6 +268,7 @@ export default function App() {
         {showIntegrations && <IntegrationsSettings onClose={() => setShowIntegrations(false)} showToast={showToast} />}
         {showAdultGoals && <AdultGoals onClose={() => setShowAdultGoals(false)} showToast={showToast} />}
         {showChildProfile && <ChildProfile onClose={() => setShowChildProfile(false)} showToast={showToast} />}
+        {showMood && <MoodCheckIn onClose={dismissMood} />}
         {toast && <div className="toast">{toast}</div>}
       </div>
     </>
