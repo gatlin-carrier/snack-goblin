@@ -2094,7 +2094,7 @@ app.get('/api/cook-history', (req, res) => {
 
 app.post('/api/notify/test', async (req, res) => {
   try {
-    await sendNtfy({ title: '🍽️ Meal Planner', message: 'Notifications are working!', priority: 3, tags: ['white_check_mark'] });
+    await sendNtfy({ title: '👹 Snack Goblins', message: 'the goblin can reach you. nice.', priority: 3, tags: ['white_check_mark'] });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
@@ -2459,14 +2459,14 @@ cron.schedule('0 18 * * 0', async () => {
       "SELECT COUNT(*) as c FROM first_foods WHERE date_tried >= date('now', '-7 days')"
     ).get()?.c || 0;
 
-    const recapLines = [`${generated.length} new recipes ready to browse`];
-    if (plan?.meal_count >= 5) recapLines.push(`This week's plan looks good — ${plan.meal_count} meals`);
-    if (leftoversExpiring > 0) recapLines.push(`⚠️ ${leftoversExpiring} leftover${leftoversExpiring > 1 ? 's' : ''} expiring soon`);
-    if (firstFoodsThisWeek > 0) recapLines.push(`👶 ${firstFoodsThisWeek} new food${firstFoodsThisWeek > 1 ? 's' : ''} introduced this week`);
+    const recapLines = [`the goblin restocked — ${generated.length} fresh recipes`];
+    if (plan?.meal_count >= 5) recapLines.push(`${plan.meal_count} meals planned · solid week`);
+    if (leftoversExpiring > 0) recapLines.push(`heads-up: ${leftoversExpiring} leftover${leftoversExpiring > 1 ? 's' : ''} need eating soon`);
+    if (firstFoodsThisWeek > 0) recapLines.push(`👶 ${firstFoodsThisWeek} new food${firstFoodsThisWeek > 1 ? 's' : ''} for the toddler this week`);
 
     console.log(`[cron] Generated ${generated.length} recipes`);
     await sendNtfy({
-      title: '🍽️ Family Fed Weekly Recap',
+      title: '👹 Sunday recap',
       message: recapLines.join(' · '),
       priority: 3,
       tags: ['fork_and_knife'],

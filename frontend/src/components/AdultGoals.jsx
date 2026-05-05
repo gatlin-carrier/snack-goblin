@@ -50,7 +50,7 @@ export default function AdultGoals({ onClose, showToast }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) { showToast('Error saving goals'); return; }
-      showToast('Adult nutrition goals saved');
+      showToast('goals saved. dashboard will reflect them.');
       onClose();
     } finally {
       setSaving(false);

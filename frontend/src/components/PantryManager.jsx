@@ -162,12 +162,12 @@ export default function PantryManager({ showToast }) {
     });
     setNewFreezerName(''); setNewFreezerServings(2);
     loadFreezer();
-    showToast('Added to freezer');
+    showToast('on ice. future-you says thanks.');
   }
   async function removeFreezerItem(id, name) {
     await fetch(`/api/freezer/${id}`, { method: 'DELETE' });
     setFreezer(f => f.filter(i => i.id !== id));
-    showToast(`Removed ${name}`);
+    showToast(`tossed ${name}`);
   }
   async function addFood(item) {
     const res = await fetch('/api/pantry', {
@@ -175,12 +175,12 @@ export default function PantryManager({ showToast }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    if (res.ok) { loadFood(); showToast(`Added ${item.ingredient_name}`); }
+    if (res.ok) { loadFood(); showToast(`stashed ${item.ingredient_name}`); }
   }
   async function removeFood(id, name) {
     await fetch(`/api/pantry/${id}`, { method: 'DELETE' });
     setFood(f => f.filter(i => i.id !== id));
-    showToast(`Removed ${name}`);
+    showToast(`tossed ${name}`);
   }
   async function addEquipment(item) {
     const res = await fetch('/api/equipment', {
@@ -188,13 +188,13 @@ export default function PantryManager({ showToast }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    if (res.ok) { loadEquipment(); showToast(`Added ${item.name}`); }
-    else { const d = await res.json(); showToast(d.error || 'Error'); }
+    if (res.ok) { loadEquipment(); showToast(`logged ${item.name}`); }
+    else { const d = await res.json(); showToast(d.error || "couldn't add that one"); }
   }
   async function removeEquipment(id, name) {
     await fetch(`/api/equipment/${id}`, { method: 'DELETE' });
     setEquipment(e => e.filter(i => i.id !== id));
-    showToast(`Removed ${name}`);
+    showToast(`tossed ${name}`);
   }
 
   const filteredFood = food.filter(i => !search || i.ingredient_name.toLowerCase().includes(search.toLowerCase()));
@@ -291,8 +291,8 @@ export default function PantryManager({ showToast }) {
           </Glass>
 
           {freezer.length === 0 ? (
-            <EmptyState icon="🧊" title="Freezer is empty"
-              body="Log batch-cooked meals you've frozen — the dashboard will remind you before they expire." />
+            <EmptyState icon="🧊" title="nothing on ice"
+              body="future-you will thank present-you. log batch-cooked meals here and i'll remind you before they expire." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {freezer.map(item => {
@@ -327,14 +327,14 @@ export default function PantryManager({ showToast }) {
           <AddFoodForm onAdd={addFood} prefill={scanPrefill} onScanRequest={() => setShowScanner(true)} />
           {showScanner && (
             <BarcodeScanner
-              onScanned={result => { setScanPrefill(result); setShowScanner(false); showToast(`Found: ${result.name}`); }}
+              onScanned={result => { setScanPrefill(result); setShowScanner(false); showToast(`found it: ${result.name}`); }}
               onClose={() => setShowScanner(false)}
             />
           )}
 
           {Object.keys(byCategory).length === 0 && (
-            <EmptyState icon="🫙" title="Pantry is empty"
-              body="Add staples you have on hand — the shopping list will subtract them." />
+            <EmptyState icon="🫙" title="the stash is bare"
+              body="toss something in. the shopping list will subtract whatever you've already got." />
           )}
 
           {FOOD_CATEGORIES.filter(c => byCategory[c.key]?.length).map(cat => (
@@ -383,8 +383,8 @@ export default function PantryManager({ showToast }) {
           <AddEquipmentForm onAdd={addEquipment} />
 
           {filteredEquipment.length === 0 ? (
-            <EmptyState icon="🔧" title="No equipment logged"
-              body="Add appliances and tools — Claude will suggest recipes that use them." />
+            <EmptyState icon="🔧" title="no tools logged"
+              body="tell me what you've got. i'll suggest recipes that actually use them." />
           ) : (
             <Glass padding={4}>
               {filteredEquipment.map((item, i) => (

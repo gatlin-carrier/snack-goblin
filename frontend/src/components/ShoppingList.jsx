@@ -32,7 +32,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
   }
 
   async function generate() {
-    if (!currentPlan?.id) { showToast('No active meal plan'); return; }
+    if (!currentPlan?.id) { showToast('no plan to shop for yet'); return; }
     setGenerating(true);
     try {
       await fetch('/api/shopping-lists', {
@@ -41,9 +41,9 @@ export default function ShoppingList({ currentPlan, showToast }) {
         body: JSON.stringify({ meal_plan_id: currentPlan.id }),
       });
       loadList(currentPlan.id);
-      showToast('Shopping list generated!');
+      showToast("list ready. let's forage.");
     } catch {
-      showToast('Failed to generate list');
+      showToast("couldn't build the list. try again?");
     } finally {
       setGenerating(false);
     }
@@ -67,7 +67,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
     const res = await fetch(`/api/shopping-lists/${list.id}/export`);
     const text = await res.text();
     await navigator.clipboard.writeText(text);
-    showToast('Shopping list copied to clipboard!');
+    showToast('copied. paste anywhere.');
   }
 
   if (loading) {
@@ -81,9 +81,9 @@ export default function ShoppingList({ currentPlan, showToast }) {
         <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
           <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
-            No active meal plan
+            no plan yet
           </div>
-          <div style={{ color: THEME.dim }}>Build a meal plan first, then generate your shopping list here.</div>
+          <div style={{ color: THEME.dim }}>build a meal plan first and i'll turn it into a shopping list.</div>
         </Glass>
       </div>
     );
@@ -96,13 +96,13 @@ export default function ShoppingList({ currentPlan, showToast }) {
         <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
           <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
-            No shopping list yet
+            no list yet
           </div>
           <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14 }}>
-            Generate a shopping list from your meal plan.
+            i'll pull one together from this week's plan.
           </div>
           <button style={{ ...glassBtnPrimary, opacity: generating ? 0.5 : 1 }} onClick={generate} disabled={generating}>
-            {generating ? 'Generating…' : 'Generate shopping list'}
+            {generating ? 'generating…' : "let's forage"}
           </button>
         </Glass>
       </div>
@@ -159,7 +159,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
         <Glass tint="oklch(0.55 0.10 145 / 0.20)" padding={20} style={{ marginBottom: 22, textAlign: 'center' }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🎉</div>
           <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', color: THEME.ink }}>
-            All done · happy cooking
+            all foraged · go cook something good
           </div>
         </Glass>
       )}

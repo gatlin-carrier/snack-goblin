@@ -54,9 +54,9 @@ export default function MealHistory() {
           <div style={{
             fontFamily: display, fontSize: 22, fontStyle: 'italic',
             color: THEME.ink, marginBottom: 8,
-          }}>No cook history yet</div>
+          }}>no meals on record</div>
           <div style={{ fontSize: 13, color: THEME.dim, lineHeight: 1.55 }}>
-            When you finish a recipe in Cook Mode, it gets logged here.
+            cook one in Cook Mode and i'll remember.
           </div>
         </Glass>
       ) : (

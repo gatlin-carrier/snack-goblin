@@ -58,14 +58,14 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
   }
 
   async function addToPlan(recipe) {
-    if (!currentPlan?.id) { showToast('No active plan — go to Meal Plan tab'); return; }
+    if (!currentPlan?.id) { showToast("no plan yet. hop to the Plan tab to start one."); return; }
     await fetch(`/api/meal-plans/${currentPlan.id}/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipe_id: recipe.id, meal_type: recipe.meal_type, servings_adult: 2, servings_toddler: 1 }),
     });
     setPlanItemCount(c => c + 1);
-    showToast(`Added "${recipe.name}" to this week`);
+    showToast(`added "${recipe.name}" to this week`);
     loadRecipes();
   }
 
@@ -77,21 +77,21 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
     });
     const data = await res.json();
     setRecipes(rs => rs.map(r => r.id === recipe.id ? { ...r, star_rating: data.star_rating, rating_count: data.rating_count, in_rotation: data.in_rotation } : r));
-    if (data.in_rotation === 0) showToast(`"${recipe.name}" paused from rotation (low rating)`);
-    else showToast(`Rated "${recipe.name}" ${stars}★`);
+    if (data.in_rotation === 0) showToast(`"${recipe.name}" paused — low rating, no shame`);
+    else showToast(`rated "${recipe.name}" ${stars}★ · noted`);
   }
 
   async function toggleRotation(recipe) {
     const newState = recipe.in_rotation ? 0 : 1;
     await fetch(`/api/recipes/${recipe.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ in_rotation: newState }) });
     setRecipes(rs => rs.map(r => r.id === recipe.id ? { ...r, in_rotation: newState } : r));
-    showToast(newState ? `"${recipe.name}" back in rotation` : `"${recipe.name}" paused`);
+    showToast(newState ? `"${recipe.name}" back in rotation` : `"${recipe.name}" benched for now`);
   }
 
   async function discard(recipe) {
     await fetch(`/api/recipes/${recipe.id}`, { method: 'DELETE' });
     setRecipes(rs => rs.filter(r => r.id !== recipe.id));
-    showToast('Recipe deleted');
+    showToast('recipe tossed');
   }
 
   const allTags = [...new Set(recipes.flatMap(r => r.tags || []))].sort();
@@ -211,12 +211,12 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
             fontFamily: display, fontSize: 24, fontStyle: 'italic', fontWeight: 500,
             color: THEME.ink, marginBottom: 10,
           }}>
-            {activeCollection ? `No recipes in "${activeCollection.name}"` : activeTag ? `No recipes tagged "${activeTag}"` : 'No recipes yet'}
+            {activeCollection ? `nothing in "${activeCollection.name}" yet` : activeTag ? `nothing tagged "${activeTag}"` : "the cauldron's empty"}
           </div>
           <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14, lineHeight: 1.5 }}>
-            {activeCollection ? 'Open any recipe and use "+ Collection" to add it here.' : 'Generate meal options with AI to get started.'}
+            {activeCollection ? "open any recipe and use \"+ Collection\" to add it here." : "let's fill it. i'll generate a few options based on your preferences."}
           </div>
-          {!activeCollection && <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ Generate Recipes</button>}
+          {!activeCollection && <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ generate recipes</button>}
         </Glass>
       ) : (
         <div className="grid-auto">
@@ -240,9 +240,9 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
         onToggleRotation={() => toggleRotation(selected)}
         onUpdated={(updated) => { setRecipes(rs => rs.map(r => r.id === updated.id ? updated : r)); setSelected(updated); }}
       />}
-      {showGenerate && <GeneratePanel onClose={() => setShowGenerate(false)} onGenerated={(data) => { setShowGenerate(false); showToast(`Generated ${data.generated} recipes`); loadRecipes(); }} />}
+      {showGenerate && <GeneratePanel onClose={() => setShowGenerate(false)} onGenerated={(data) => { setShowGenerate(false); showToast(`${data.generated} fresh recipes in the cauldron`); loadRecipes(); }} />}
       {showPrefs && <PreferencesPanel onClose={() => setShowPrefs(false)} />}
-      {showImport && <ImportURLPanel onClose={() => setShowImport(false)} onImported={() => { showToast('Recipe imported!'); loadRecipes(); }} />}
+      {showImport && <ImportURLPanel onClose={() => setShowImport(false)} onImported={() => { showToast('imported. nice find.'); loadRecipes(); }} />}
     </div>
   );
 }

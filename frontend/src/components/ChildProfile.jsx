@@ -71,7 +71,7 @@ export default function ChildProfile({ onClose, showToast }) {
       const data = await res.json();
       if (data.error) { showToast(`Error: ${data.error}`); return; }
       setProfile(data);
-      showToast('Child profile saved — nutrition guidelines updated');
+      showToast("got it. nutrition guidelines now match their age.");
     } finally {
       setSaving(false);
     }

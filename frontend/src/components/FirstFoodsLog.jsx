@@ -49,14 +49,14 @@ export default function FirstFoodsLog({ showToast }) {
     setNewFood(''); setNewNotes(''); setNewReaction('none');
     setShowAdd(false);
     setSaving(false);
-    showToast(`${newFood} logged!`);
+    showToast(`logged ${newFood}. one more for the record.`);
     load();
   }
 
   async function removeFood(id, name) {
     await fetch(`/api/first-foods/${id}`, { method: 'DELETE' });
     setFoods(f => f.filter(i => i.id !== id));
-    showToast(`Removed ${name}`);
+    showToast(`unlogged ${name}`);
   }
 
   const filtered = filter === 'all' ? foods : foods.filter(f => f.reaction === filter);
@@ -193,9 +193,9 @@ export default function FirstFoodsLog({ showToast }) {
           <div style={{
             fontFamily: display, fontSize: 22, fontStyle: 'italic',
             color: THEME.ink, marginBottom: 8,
-          }}>{filter === 'all' ? 'No foods logged yet' : `No ${reactionInfo(filter).label.toLowerCase()} reactions`}</div>
+          }}>{filter === 'all' ? 'no foods logged yet' : `no ${reactionInfo(filter).label.toLowerCase()} reactions`}</div>
           <div style={{ fontSize: 13, color: THEME.dim, lineHeight: 1.55 }}>
-            Log each new food as you introduce it — track reactions and build a record.
+            log each new food as you introduce it. i'll keep track so you don't have to.
           </div>
         </Glass>
       ) : (

@@ -72,14 +72,14 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error || 'Auto-curate failed'); return; }
-      showToast(`Picked ${data.picked} meals · ${data.alternates} alternates`);
+      showToast(`picked ${data.picked} meals · ${data.alternates} alternates ready to swap`);
       await loadPlan();
     } finally { setCurating(false); }
   }
 
   async function removeItem(item) {
     await fetch(`/api/meal-plans/${plan.id}/items/${item.id}`, { method: 'DELETE' });
-    showToast(`Removed "${item.name}"`);
+    showToast(`tossed "${item.name}"`);
     loadPlan();
   }
 
@@ -99,15 +99,15 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       body: JSON.stringify({ alternate_id: alternateId }),
     });
     setSwapFromId(null);
-    showToast('Swapped');
+    showToast('swapped. nice trade.');
     loadPlan();
   }
 
   async function generateShoppingList() {
-    if (!plan?.items?.length) { showToast('Add some meals first'); return; }
+    if (!plan?.items?.length) { showToast('plan some meals first, then i can shop for them'); return; }
     const res = await fetch('/api/shopping-lists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meal_plan_id: plan.id }) });
     const data = await res.json();
-    if (data.id) { showToast('Shopping list generated!'); onNavigate('shopping'); }
+    if (data.id) { showToast("list ready. let's forage."); onNavigate('shopping'); }
   }
 
   async function saveTemplate() {
@@ -117,7 +117,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
     setNewTemplateName('');
     const t = await fetch('/api/plan-templates').then(r => r.json());
     setTemplates(t);
-    showToast('Template saved');
+    showToast('saved. reach for it next week.');
     setSavingTemplate(false);
   }
 
@@ -321,7 +321,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                   <div style={{ padding: 14 }}>
                     {mealCount === 0 && (
                       <div style={{ fontSize: 13, color: THEME.dim, padding: '12px 0', fontStyle: 'italic' }}>
-                        Nothing planned. Use Auto-curate or drag from Unscheduled.
+                        nothing here yet. drag from unscheduled or let auto-curate take a swing.
                       </div>
                     )}
                     {MEAL_SLOTS.map(slot => {
@@ -485,7 +485,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
           {primaries.length === 0 ? (
             <Glass padding={32} style={{ textAlign: 'center' }}>
-              <div style={{ color: THEME.dim }}>No meals planned yet</div>
+              <div style={{ color: THEME.dim }}>nothing planned yet</div>
             </Glass>
           ) : (
             primaries.map(item => {
@@ -579,11 +579,11 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       {primaries.length === 0 && !unscheduled.length && (
         <Glass padding={48} style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
-          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>Nothing planned yet</div>
+          <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>this week's blank</div>
           <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14 }}>
-            Use Auto-curate above to fill the week from your recipes, or browse and add manually.
+            want me to draft one? hit auto-curate above. or browse the library and pick yourself.
           </div>
-          <button style={glassBtnPrimary} onClick={() => onNavigate('recipes')}>Browse Recipes</button>
+          <button style={glassBtnPrimary} onClick={() => onNavigate('recipes')}>browse recipes</button>
         </Glass>
       )}
 
@@ -654,15 +654,15 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                       <button style={{ ...glassBtnPrimary, fontSize: 12, padding: '6px 14px' }}
                         onClick={async () => {
                           const res = await fetch(`/api/meal-plans/from-template/${t.id}`, { method: 'POST' });
-                          if (res.ok) { showToast(`Loaded "${t.name}"`); setShowTemplates(false); loadPlan(); }
-                          else showToast('Failed to load template');
+                          if (res.ok) { showToast(`loaded "${t.name}". this week's set.`); setShowTemplates(false); loadPlan(); }
+                          else showToast("couldn't load that one. try again?");
                         }}>
                         Load →
                       </button>
                       <button onClick={async () => {
                         await fetch(`/api/plan-templates/${t.id}`, { method: 'DELETE' });
                         setTemplates(ts => ts.filter(x => x.id !== t.id));
-                        showToast(`Deleted "${t.name}"`);
+                        showToast(`tossed "${t.name}"`);
                       }} style={{ background: 'none', border: 'none', color: THEME.dim, cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>✕</button>
                     </Glass>
                   ))}

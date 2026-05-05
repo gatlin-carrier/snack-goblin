@@ -19,7 +19,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
       setBackfillStatus(s);
       if (!s.in_progress) {
         setBackfilling(false);
-        showToast('Image backfill complete');
+        showToast('every recipe has a face now');
       }
     }, 3000);
     return () => clearInterval(id);
@@ -32,7 +32,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
       setPriceStatus(s);
       if (!s.in_progress) {
         setRefreshingPrices(false);
-        showToast('Price refresh complete');
+        showToast('prices refreshed');
       }
     }, 4000);
     return () => clearInterval(id);
@@ -62,7 +62,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
       setRefreshingPrices(false);
       return;
     }
-    showToast(`Pricing ${data.queued} recipes via Claude…`);
+    showToast(`pricing ${data.queued} recipes via Claude…`);
     setPriceStatus({ in_progress: true, remaining: data.queued });
   }
 
@@ -78,7 +78,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
       if (!res.ok) { showToast('Failed to save key'); return; }
       setPexelsKey('');
       setPexelsConfigured(true);
-      showToast('Pexels API key saved');
+      showToast('Pexels key saved');
     } finally { setSaving(false); }
   }
 
@@ -91,7 +91,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
       setBackfilling(false);
       return;
     }
-    showToast(`Fetching images for ${data.queued} recipes…`);
+    showToast(`fetching images for ${data.queued} recipes…`);
     setBackfillStatus({ in_progress: true, remaining: data.queued });
   }
 

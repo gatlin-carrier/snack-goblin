@@ -26,7 +26,7 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
       });
       if (!res.ok) { const d = await res.json(); showToast(d.error || 'Error'); return; }
       setNewName('');
-      showToast('Collection created');
+      showToast('theme started');
       load();
     } finally { setAdding(false); }
   }
@@ -34,7 +34,7 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
   async function remove(col) {
     await fetch(`/api/collections/${col.id}`, { method: 'DELETE' });
     setCollections(c => c.filter(x => x.id !== col.id));
-    showToast(`Deleted "${col.name}"`);
+    showToast(`tossed "${col.name}"`);
   }
 
   async function expand(col) {
@@ -48,7 +48,7 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
     await fetch(`/api/collections/${colId}/recipes/${recipeId}`, { method: 'DELETE' });
     setExpandedRecipes(r => r.filter(x => x.id !== recipeId));
     setCollections(c => c.map(x => x.id === colId ? { ...x, recipe_count: Math.max(0, (x.recipe_count || 1) - 1) } : x));
-    showToast(`Removed "${recipeName}"`);
+    showToast(`pulled "${recipeName}" out of the theme`);
   }
 
   return (
@@ -87,10 +87,10 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
         <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 38, marginBottom: 12 }}>🗂</div>
           <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
-            No collections yet
+            no themes saved
           </div>
           <div style={{ fontSize: 13, color: THEME.dim, lineHeight: 1.55 }}>
-            Group recipes by theme — "High Protein", "Kid Favorites", "Date Night", whatever fits your family.
+            group recipes that vibe together — "high protein", "toddler will eat", "lazy sunday", whatever fits.
           </div>
         </Glass>
       ) : (
@@ -123,7 +123,7 @@ export default function CollectionsPanel({ showToast, onFilterByCollection }) {
                 <div style={{ borderTop: `1px solid ${THEME.hairline}`, padding: '8px 16px 14px' }}>
                   {expandedRecipes.length === 0 ? (
                     <div style={{ fontSize: 13, color: THEME.dim, padding: '8px 0', fontStyle: 'italic' }}>
-                      No recipes yet. Open a recipe and use "+ Collection" to add it here.
+                      empty so far. open any recipe and use "+ Collection" to drop it in.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>

@@ -31,7 +31,7 @@ export default function NtfySettings({ onClose, showToast }) {
       body: JSON.stringify({ ntfy_url: url.trim(), ntfy_topic: topic.trim() }),
     });
     setSaving(false);
-    showToast('Notification settings saved');
+    showToast('saved. push pings will reach you.');
     onClose();
   }
 
@@ -45,8 +45,8 @@ export default function NtfySettings({ onClose, showToast }) {
       });
       const res = await fetch('/api/notify/test', { method: 'POST' });
       const data = await res.json();
-      showToast(data.ok ? '✓ Test notification sent!' : `Failed: ${data.error}`);
-    } catch (e) { showToast('Failed to send test'); }
+      showToast(data.ok ? '✓ test sent. check your phone.' : `failed: ${data.error}`);
+    } catch (e) { showToast("couldn't send a test ping"); }
     setTesting(false);
   }
 
