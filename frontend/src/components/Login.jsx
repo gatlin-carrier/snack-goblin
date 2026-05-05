@@ -1,6 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { Glass, THEME, display, ambientBG, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+
+const RESEND_COOLDOWN = 60;
+
+function ResendTimer({ secondsLeft, onResend, sending }) {
+  const ready = secondsLeft <= 0;
+  const pct = ready ? 1 : (RESEND_COOLDOWN - secondsLeft) / RESEND_COOLDOWN;
+  return (
+    <button
+      type="button"
+      onClick={ready && !sending ? onResend : undefined}
+      disabled={!ready || sending}
+      style={{
+        position: 'relative',
+        ...glassBtnGhost,
+        width: '100%',
+        padding: '11px 16px',
+        fontSize: 13,
+        cursor: ready && !sending ? 'pointer' : 'default',
+        opacity: sending ? 0.6 : 1,
+        overflow: 'hidden',
+      }}
+      title={ready ? 'Resend the magic link' : `Wait ${secondsLeft}s before resending`}
+    >
+      {/* fill bar showing time elapsed */}
+      <span aria-hidden="true" style={{
+        position: 'absolute', inset: 0,
+        width: `${pct * 100}%`,
+        background: ready
+          ? `linear-gradient(90deg, oklch(0.78 0.07 145 / 0.25), oklch(0.78 0.07 145 / 0.15))`
+          : `linear-gradient(90deg, oklch(0.62 0.14 35 / 0.18), oklch(0.62 0.14 35 / 0.08))`,
+        transition: 'width 1s linear',
+        pointerEvents: 'none',
+      }} />
+      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        {sending ? 'Sending…' : ready ? '↻ Resend magic link' : (
+          <>
+            <span style={{ fontVariantNumeric: 'tabular-nums', color: THEME.dim }}>
+              Resend in <strong style={{ color: THEME.ink, fontWeight: 700 }}>{secondsLeft}s</strong>
+            </span>
+          </>
+        )}
+      </span>
+    </button>
+  );
+}
 
 function FieldLabel({ children }) {
   return (
@@ -36,6 +81,14 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resentAt, setResentAt] = useState(null);
+
+  useEffect(() => {
+    if (!sent || secondsLeft <= 0) return;
+    const id = setInterval(() => setSecondsLeft(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [sent, secondsLeft]);
 
   async function send(e) {
     e?.preventDefault();
@@ -43,7 +96,28 @@ export default function Login() {
     setSending(true);
     const ok = await signInWithMagicLink(email.trim());
     setSending(false);
-    if (ok) setSent(true);
+    if (ok) {
+      setSent(true);
+      setSecondsLeft(RESEND_COOLDOWN);
+    }
+  }
+
+  async function resend() {
+    if (sending || secondsLeft > 0) return;
+    setSending(true);
+    const ok = await signInWithMagicLink(email.trim());
+    setSending(false);
+    if (ok) {
+      setSecondsLeft(RESEND_COOLDOWN);
+      setResentAt(Date.now());
+    }
+  }
+
+  function reset() {
+    setSent(false);
+    setEmail('');
+    setSecondsLeft(0);
+    setResentAt(null);
   }
 
   return (
@@ -79,11 +153,24 @@ export default function Login() {
                   color: THEME.ink, marginBottom: 8,
                 }}>Check your email</div>
                 <div style={{ color: THEME.text, fontSize: 13, lineHeight: 1.55, marginBottom: 18 }}>
-                  We sent a magic link to <strong style={{ color: THEME.ink }}>{email}</strong>. Tap it on this device to sign in.
+                  {resentAt ? 'Resent — t' : 'T'}ap the link in <strong style={{ color: THEME.ink }}>{email}</strong> on this device to sign in.
                 </div>
+
+                <ResendTimer
+                  secondsLeft={secondsLeft}
+                  onResend={resend}
+                  sending={sending}
+                />
+
+                {error && (
+                  <Glass tint="oklch(0.55 0.18 25 / 0.18)" padding={10} style={{ marginTop: 12 }}>
+                    <div style={{ color: THEME.red, fontSize: 12 }}>⚠ {error}</div>
+                  </Glass>
+                )}
+
                 <button
-                  style={{ ...glassBtnGhost, fontSize: 12 }}
-                  onClick={() => { setSent(false); setEmail(''); }}
+                  style={{ ...glassBtnGhost, fontSize: 12, marginTop: 14, opacity: 0.85 }}
+                  onClick={reset}
                 >Use a different method</button>
               </div>
             ) : (
