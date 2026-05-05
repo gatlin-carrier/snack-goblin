@@ -9,6 +9,7 @@ const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
 const { chat } = require('./llm');
+const { requireAuth } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3710;
@@ -33,15 +34,10 @@ const llmLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: tr
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
 app.use('/api', apiLimiter);
 
-// Optional bearer-token auth — activate by setting APP_SECRET env var.
-// When set, every /api/* request must include: Authorization: Bearer <secret>
-const APP_SECRET = process.env.APP_SECRET;
-if (APP_SECRET) {
-  app.use('/api', (req, res, next) => {
-    if (req.headers.authorization === `Bearer ${APP_SECRET}`) return next();
-    res.status(401).json({ error: 'Unauthorized' });
-  });
-}
+// Supabase JWT auth — every /api/* request requires a valid bearer token from
+// an allowlisted Supabase user. Configure via SUPABASE_URL,
+// SUPABASE_PUBLISHABLE_KEY, ALLOWED_EMAILS env vars.
+app.use('/api', requireAuth);
 
 // ─── Security helpers ─────────────────────────────────────────────────────────
 
@@ -280,6 +276,22 @@ const migrations = [
   "ALTER TABLE recipes ADD COLUMN image_url TEXT",
   "ALTER TABLE recipes ADD COLUMN image_attribution TEXT",
   "ALTER TABLE recipes ADD COLUMN image_source_url TEXT",
+  // Phase 1A — Supabase auth: add user_id columns. Queries are not yet
+  // scoped (single-tenant for now); Phase 1B adds WHERE user_id = ? to SELECTs
+  // when a second user joins.
+  "ALTER TABLE recipes ADD COLUMN user_id TEXT",
+  "ALTER TABLE meal_plans ADD COLUMN user_id TEXT",
+  "ALTER TABLE shopping_lists ADD COLUMN user_id TEXT",
+  "ALTER TABLE pantry_items ADD COLUMN user_id TEXT",
+  "ALTER TABLE equipment ADD COLUMN user_id TEXT",
+  "ALTER TABLE preferences ADD COLUMN user_id TEXT",
+  "ALTER TABLE allergen_exposures ADD COLUMN user_id TEXT",
+  "ALTER TABLE cook_log ADD COLUMN user_id TEXT",
+  "ALTER TABLE freezer_items ADD COLUMN user_id TEXT",
+  "ALTER TABLE leftovers ADD COLUMN user_id TEXT",
+  "ALTER TABLE first_foods ADD COLUMN user_id TEXT",
+  "ALTER TABLE collections ADD COLUMN user_id TEXT",
+  "ALTER TABLE plan_templates ADD COLUMN user_id TEXT",
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch {}

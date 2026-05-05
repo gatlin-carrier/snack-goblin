@@ -14,6 +14,8 @@ import AdultGoals from './components/AdultGoals.jsx';
 import FirstFoodsLog from './components/FirstFoodsLog.jsx';
 import CollectionsPanel from './components/CollectionsPanel.jsx';
 import { GlassPill, THEME } from './lib/glass.jsx';
+import { useAuth } from './lib/auth.jsx';
+import Login from './components/Login.jsx';
 
 const TOP_NAV = [
   { id: 'dashboard', label: 'This Week' },
@@ -38,7 +40,7 @@ const TAB_BAR = [
   { id: 'menu',      label: 'More',    icon: '···' },
 ];
 
-function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settingsHandlers }) {
+function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settingsHandlers, onSignOut }) {
   return (
     <header className="glass-topnav">
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, paddingLeft: 8 }}>
@@ -62,6 +64,7 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
         <GlassPill onClick={() => settingsHandlers.openNtfy()} title="Notifications">🔔</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="Adult goals">💪</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="Child profile">🧒</GlassPill>
+        <GlassPill onClick={onSignOut} title="Sign out">↪</GlassPill>
         {showMoreMenu && (
           <div style={{
             position: 'absolute', top: '100%', right: 0, marginTop: 10, zIndex: 60,
@@ -113,6 +116,7 @@ function GlassTabBar({ view, setView, onMoreOpen }) {
 }
 
 export default function App() {
+  const { loading, session, signOut } = useAuth();
   const [view, setView] = useState('dashboard');
   const [currentPlan, setCurrentPlan] = useState(null);
   const [toast, setToast] = useState(null);
@@ -123,6 +127,21 @@ export default function App() {
   const [showAdultGoals, setShowAdultGoals] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+
+  if (loading) {
+    return (
+      <>
+        <div className="mesh-bg" />
+        <div style={{
+          minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: THEME.dim, gap: 12, position: 'relative',
+        }}>
+          <div className="spinner" /> Loading…
+        </div>
+      </>
+    );
+  }
+  if (!session) return <Login />;
 
   function showToast(msg, duration = 3000) {
     setToast(msg);
@@ -163,6 +182,7 @@ export default function App() {
           onMoreToggle={() => setShowMoreMenu(v => !v)}
           onMore={() => setShowMoreMenu(false)}
           settingsHandlers={settingsHandlers}
+          onSignOut={signOut}
         />
 
         <main className="main">{renderView()}</main>
@@ -189,6 +209,8 @@ export default function App() {
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 Notifications</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
+                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { signOut(); setShowMobileMore(false); }}>↪ Sign out</button>
               </div>
             </div>
           </div>
