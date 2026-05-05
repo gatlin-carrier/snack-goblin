@@ -335,8 +335,9 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
               </div>
             )}
             {calciumNote && (
-              <Glass radius={14} padding={'12px 14px'} tint="oklch(0.68 0.13 80 / 0.18)" style={{ marginTop: 22, fontSize: 13, color: THEME.ink, lineHeight: 1.5 }}>
-                <b>just noticing.</b> {calciumNote}
+              <Glass radius={14} padding={'12px 14px'} style={{ marginTop: 22, fontSize: 13, color: THEME.text, lineHeight: 1.55 }}>
+                <span style={{ color: THEME.dim, fontWeight: 600, marginRight: 4 }}>just noticing —</span>
+                {calciumNote}
               </Glass>
             )}
           </Glass>

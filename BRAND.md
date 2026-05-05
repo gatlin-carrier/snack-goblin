@@ -111,6 +111,116 @@ Surfaces: dashboard widget, login splash, occasional toasts.
   comfort meal type
 - Goblin "i'll remember that" close
 
+### Phase G — households (shared data between family members)
+**Goal:** husband + wife (and eventually grown-up kid roles) see the same
+recipes, plans, pantry, shopping list. Each member has their own login,
+their own per-user prefs (energy, mood, adult goals), but everything
+content-y is household-scoped.
+
+**Schema:**
+```sql
+CREATE TABLE households (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,                          -- "the carrier den"
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  founder_user_id TEXT NOT NULL
+);
+
+CREATE TABLE household_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  household_id INTEGER NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  user_id TEXT,                       -- null until they log in for the first time
+  email TEXT NOT NULL,
+  display_name TEXT,
+  role TEXT DEFAULT 'member',         -- 'founder' | 'member'
+  invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  joined_at DATETIME,
+  UNIQUE(household_id, email)
+);
+```
+
+**Migration:**
+- ALTER all 13 user-scoped tables to add `household_id INTEGER`
+- On first founder login: create `households` row, add user as `founder`
+  member, backfill all existing rows with that household_id
+- Replace per-query `user_id` filtering with `household_id` filtering
+  (auth middleware sets `req.householdId` derived from
+  `household_members.user_id = req.userId`)
+
+**Auth middleware updates:**
+- Look up `household_members.email = req.user.email`
+- If found: set `req.householdId`, claim the row's user_id if null
+  (replaces ALLOWED_EMAILS env var as the gate — invitation IS the gate)
+- If not found: 403 "this account isn't part of any household"
+- Fall back to ALLOWED_EMAILS for legacy compatibility / break-glass
+
+**Onboarding step (insert between current step 0 and step 1):**
+- "who else is in this household?"
+- Repeating row: name + email + role pill (parent / kid / adult / etc)
+- Skip allowed (singleton household)
+- On submit: invite emails → household_members rows. They get a magic
+  link via Supabase admin invite; on first login they're auto-linked.
+- Goblin copy: "anyone else in the den? add their email and i'll
+  let them in when they sign in."
+
+**UI surfaces:**
+- Settings → "Household" panel: rename, list members, invite, remove
+- Top-nav avatar/initial chip showing whose session is active
+- Activity attribution: cook log shows "cooked by gatlin", recipe history
+  shows who added each recipe (use existing user_id columns for attribution
+  even though scoping is household-level)
+- Optional: per-member visibility toggles for sensitive things (adult
+  goals stay private to each member by default — already are, since they're
+  in user_prefs)
+
+**Estimated scope:** 1–1.5 days. Touches schema, auth middleware,
+~118 SQL queries (the Phase 1B work that was deferred), onboarding UI,
+new Settings panel.
+
+## Auth wishlist (separate from the brand phases)
+
+These are infra/UX improvements to the auth flow, tracked here so they
+don't get lost. Standalone projects, can ship in any order.
+
+### Face ID / WebAuthn passkey unlock
+**Why:** magic link is great for cold logins but annoying when you're
+already on your phone and just want to peek. Face ID for re-auth on a
+trusted device is the iPhone-native expectation.
+
+**Approach:**
+- After first magic-link login, prompt: "use Face ID to sign in next time?"
+- Use the Web Authentication API: `navigator.credentials.create()` with
+  `userVerification: 'required'` registers a platform passkey on iOS/macOS
+- Store the credential's public key on the backend (new `user_passkeys`
+  table keyed by user_id)
+- Login screen adds a "👁 use Face ID" pill above the email input when a
+  passkey is registered for this device — `navigator.credentials.get()`
+  challenges the device, backend verifies, issues Supabase session
+- Supabase doesn't support WebAuthn directly, but the verified passkey
+  can be used to sign a custom JWT or trigger a passwordless sign-in
+- For PWA install (Add to Home Screen), this also unlocks "biometric on
+  app open" without leaving Safari
+
+**Estimated scope:** 1 day. New backend endpoints (register/verify), new
+DB table, Login screen UX, fallback to magic link.
+
+### Remember me / longer-lived sessions
+**Why:** currently Supabase sessions expire ~1 hour with refresh extending
+to ~1 week. For a private family app, sessions could comfortably be
+30 days. Less re-auth friction.
+
+**Approach:**
+- Supabase dashboard → Authentication → Settings → bump JWT expiry +
+  refresh token rotation window (project-wide, not per-user)
+- OR: add a "remember me" checkbox on Login that calls `signInWithOtp`
+  with `options.shouldCreateUser: false, options.captchaToken: undefined`
+  — then on auth state change, opt into longer refresh
+- Actually the cleanest path: just bump expiry in Supabase dashboard.
+  No code changes needed. Default to long-lived for this app.
+
+**Estimated scope:** 5 minutes (dashboard config) + optional 1 hr to add
+a "stay signed in" toggle on Login if you want per-session control.
+
 ## Spec for the four core ADHD-features
 
 These are the load-bearing features that make this app *for ADHD* and not
@@ -124,6 +234,32 @@ just a meal planner with goblins on top:
    are forgiven, not logged as failures.
 4. **Mascot reactions.** The goblin cares without judging. Reacts to your
    week, never punishes.
+
+## Color & nutrition feedback rules
+
+**No red/green/yellow traffic-light coding for nutrition.** Even pastel
+versions reinforce a "good/bad/scolding" frame that hits perfectionism
+loops in ADHD brains. Specifically:
+
+- **Nutrition bars** (iron, DHA, calcium, etc.) use a single calm tone —
+  not pct-keyed coloring. The bar shows progress toward the day's target
+  in sage; the number to its right is the fraction. The user interprets.
+- **No "✓ great!" or "⚠ low" labels.** Just `12 / 18 mg` and a soft fill.
+- **Optional gentle nudge** in plain prose, only when very low (<50%):
+  "iron's a bit low. red meat or lentils when you can." Never repeated,
+  never pushed to the top of a screen, never with an alert icon. Hidden
+  entirely on low-capacity days.
+- **Reaction severity** (first foods log) keeps differentiated tones
+  *only* for safety (severe = red) — but uses pastels and never large
+  splashes. A severe reaction warning that's anxiety-inducing is doing
+  its job; one for "calcium 70%" is doing harm.
+- **Streaks / counts** stay neutral — never red for "you broke it" or
+  green for "yay." Just numbers.
+
+**Color *is* used for:**
+- Brand identity (terracotta wordmark, sage success accents)
+- Functional state (active button, current selection, focus ring)
+- Time elapsed (timer fills with sage when complete — positive only)
 
 ## Out of scope (deliberately)
 

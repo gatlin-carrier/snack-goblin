@@ -106,27 +106,25 @@ export function Badge({ children, tone = 'neutral' }) {
   );
 }
 
-// ── Pastel nutrition bar ──────────────────────────────────────────
-const NUTRI_TONES = {
-  good: 'oklch(0.78 0.07 145)',
-  mid:  'oklch(0.84 0.08 80)',
-  low:  'oklch(0.78 0.09 30)',
-};
+// ── Nutrition bar — single calm tone, no traffic-light coding ─────
+// ADHD-friendly: progress is just progress. We don't reward high pct
+// with green or shame low pct with red. The number speaks for itself;
+// the bar is a soft sage fill regardless. Per BRAND.md "Color & nutrition
+// feedback rules" — gentle nudges live in prose, not in color.
+const BAR_FILL = 'oklch(0.78 0.07 145)'; // pastel sage, the same one always
 
 export function NutritionBar({ label, pct, value, max, unit }) {
-  const tone = pct >= 90 ? NUTRI_TONES.good : pct >= 65 ? NUTRI_TONES.mid : NUTRI_TONES.low;
-  const toneText = pct >= 90 ? 'oklch(0.50 0.10 145)' : pct >= 65 ? 'oklch(0.55 0.12 80)' : 'oklch(0.55 0.13 30)';
   const cap = Math.min(100, Math.max(0, pct || 0));
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
         <span style={{ fontSize: 12, color: THEME.text, fontWeight: 500 }}>{label}</span>
         <span style={{ fontSize: 11, color: THEME.dim, fontVariantNumeric: 'tabular-nums' }}>
-          <b style={{ color: toneText, fontSize: 13 }}>{Math.round(cap)}%</b> · {Math.round(value || 0)}/{Math.round(max || 0)} {unit}
+          {Math.round(value || 0)} / {Math.round(max || 0)} {unit}
         </span>
       </div>
       <div style={{ height: 6, borderRadius: 999, background: 'oklch(0.4 0.02 60 / 0.10)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${cap}%`, background: tone, borderRadius: 999, transition: 'width 0.4s' }} />
+        <div style={{ height: '100%', width: `${cap}%`, background: BAR_FILL, borderRadius: 999, transition: 'width 0.4s' }} />
       </div>
     </div>
   );

@@ -78,7 +78,9 @@ function ProviderButton({ icon, label, onClick, disabled }) {
 
 export default function Login() {
   const { signInWithMagicLink, signInWithProvider, error } = useAuth();
-  const [email, setEmail] = useState('');
+  const remembered = (typeof window !== 'undefined' ? localStorage.getItem('mealhouse_last_email') : null) || '';
+  const [email, setEmail] = useState(remembered);
+  const [showSwitch, setShowSwitch] = useState(!remembered);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -97,9 +99,16 @@ export default function Login() {
     const ok = await signInWithMagicLink(email.trim());
     setSending(false);
     if (ok) {
+      try { localStorage.setItem('mealhouse_last_email', email.trim()); } catch {}
       setSent(true);
       setSecondsLeft(RESEND_COOLDOWN);
     }
+  }
+
+  function forgetMe() {
+    try { localStorage.removeItem('mealhouse_last_email'); } catch {}
+    setEmail('');
+    setShowSwitch(true);
   }
 
   async function resend() {
@@ -177,29 +186,61 @@ export default function Login() {
               </div>
             ) : (
               <>
-                <form onSubmit={send}>
-                  <FieldLabel>Email</FieldLabel>
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    autoFocus
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    style={{ width: '100%', marginBottom: 14 }}
-                    disabled={sending}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      ...glassBtnPrimary, width: '100%', padding: '12px 16px', fontSize: 14,
-                      opacity: (!email.trim() || sending) ? 0.5 : 1,
-                    }}
-                    disabled={!email.trim() || sending}
-                  >
-                    {sending ? 'Sending…' : 'Email me a magic link'}
-                  </button>
-                </form>
+                {remembered && !showSwitch ? (
+                  <>
+                    <div style={{
+                      textAlign: 'center', padding: '4px 0 18px',
+                      fontSize: 13, color: THEME.text, lineHeight: 1.55,
+                    }}>
+                      welcome back,{' '}
+                      <strong style={{ color: THEME.ink }}>{remembered}</strong>
+                    </div>
+                    <button
+                      onClick={send}
+                      disabled={sending}
+                      style={{
+                        ...glassBtnPrimary, width: '100%', padding: '12px 16px', fontSize: 14,
+                        opacity: sending ? 0.5 : 1,
+                      }}
+                    >
+                      {sending ? 'sending…' : '✉ send me a magic link'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={forgetMe}
+                      style={{
+                        ...glassBtnGhost, width: '100%', marginTop: 10,
+                        fontSize: 12, opacity: 0.7,
+                      }}
+                    >
+                      not me · use a different email
+                    </button>
+                  </>
+                ) : (
+                  <form onSubmit={send}>
+                    <FieldLabel>Email</FieldLabel>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      autoFocus
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      style={{ width: '100%', marginBottom: 14 }}
+                      disabled={sending}
+                    />
+                    <button
+                      type="submit"
+                      style={{
+                        ...glassBtnPrimary, width: '100%', padding: '12px 16px', fontSize: 14,
+                        opacity: (!email.trim() || sending) ? 0.5 : 1,
+                      }}
+                      disabled={!email.trim() || sending}
+                    >
+                      {sending ? 'sending…' : 'email me a magic link'}
+                    </button>
+                  </form>
+                )}
 
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 12,
