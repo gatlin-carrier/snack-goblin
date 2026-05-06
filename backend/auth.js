@@ -17,10 +17,10 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
   : null;
 
-// Founder is the first allowlisted email. Their first authed request claims
-// any pre-existing NULL user_id rows. Idempotent — subsequent requests no-op.
+// Founder bootstrap email — first ALLOWED_EMAILS entry. On their first authed
+// request, we create a household if one doesn't exist, add them as founder,
+// and backfill all NULL household_id rows. Idempotent — only runs once.
 const FOUNDER_EMAIL = ALLOWED[0] || null;
-let claimedForUserId = null;
 
 const SCOPED_TABLES = [
   'recipes', 'meal_plans', 'shopping_lists', 'pantry_items', 'equipment',
@@ -28,19 +28,46 @@ const SCOPED_TABLES = [
   'leftovers', 'first_foods', 'collections', 'plan_templates',
 ];
 
-function claimFounderData(db, userId) {
-  if (claimedForUserId === userId) return;
-  let total = 0;
-  for (const table of SCOPED_TABLES) {
-    try {
-      const r = db.prepare(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL`).run(userId);
-      total += r.changes;
-    } catch (err) {
-      console.warn(`[auth] claim failed on ${table}:`, err.message);
-    }
+function bootstrapFounder(db, user, displayNameHint) {
+  // Returns the household row for this user, creating + backfilling on first run.
+  let existing = db.prepare(`
+    SELECT h.* FROM households h
+    JOIN household_members m ON m.household_id = h.id
+    WHERE m.user_id = ? OR LOWER(m.email) = LOWER(?)
+    LIMIT 1
+  `).get(user.id, user.email);
+  if (existing) {
+    // Make sure the row is linked to this user_id (handles invite-then-login)
+    db.prepare('UPDATE household_members SET user_id = ?, joined_at = COALESCE(joined_at, CURRENT_TIMESTAMP) WHERE LOWER(email) = LOWER(?) AND household_id = ?')
+      .run(user.id, user.email, existing.id);
+    return existing;
   }
-  claimedForUserId = userId;
-  if (total > 0) console.log(`[auth] founder ${userId} claimed ${total} pre-existing rows`);
+
+  // No household yet for this user. If they're the founder email, create one
+  // and claim NULL data rows.
+  if (FOUNDER_EMAIL && (user.email || '').toLowerCase() === FOUNDER_EMAIL) {
+    const result = db.prepare('INSERT INTO households (name, founder_user_id) VALUES (?, ?)')
+      .run(`${(displayNameHint || user.email || 'the').split('@')[0]}'s den`, user.id);
+    const householdId = result.lastInsertRowid;
+    db.prepare('INSERT INTO household_members (household_id, user_id, email, display_name, role, joined_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)')
+      .run(householdId, user.id, user.email, displayNameHint || null, 'founder');
+
+    // Backfill household_id on all existing user-scoped rows. This mirrors
+    // the Phase 1B claimFounderData but for households.
+    let total = 0;
+    for (const table of SCOPED_TABLES) {
+      try {
+        const r = db.prepare(`UPDATE ${table} SET household_id = ? WHERE household_id IS NULL`).run(householdId);
+        total += r.changes;
+      } catch (err) {
+        console.warn(`[auth] household backfill failed on ${table}:`, err.message);
+      }
+    }
+    console.log(`[auth] founder ${user.email} created household #${householdId}, claimed ${total} pre-existing rows`);
+    return db.prepare('SELECT * FROM households WHERE id = ?').get(householdId);
+  }
+
+  return null;
 }
 
 function makeRequireAuth({ db } = {}) {
@@ -56,18 +83,26 @@ function makeRequireAuth({ db } = {}) {
       if (error || !data?.user) return res.status(401).json({ error: 'Invalid or expired session' });
 
       const email = (data.user.email || '').toLowerCase();
-      if (ALLOWED.length > 0 && !ALLOWED.includes(email)) {
-        console.warn(`[auth] denied non-allowlisted email: ${email}`);
-        return res.status(403).json({ error: 'This account is not authorized for this app' });
+      const displayHint = data.user.user_metadata?.full_name || data.user.user_metadata?.name || null;
+
+      let household = db ? bootstrapFounder(db, data.user, displayHint) : null;
+
+      if (!household) {
+        // Not a founder, not yet a household member. Fall back to ALLOWED_EMAILS
+        // for break-glass / legacy. Otherwise reject — invitation IS the gate.
+        if (ALLOWED.length > 0 && !ALLOWED.includes(email)) {
+          console.warn(`[auth] denied — not a household member and not allowlisted: ${email}`);
+          return res.status(403).json({ error: 'This account is not part of any household. Ask the founder to invite you.' });
+        }
       }
+
+      // Re-fetch the member row so we have the role + display_name
+      const member = db ? db.prepare('SELECT * FROM household_members WHERE LOWER(email) = LOWER(?) AND household_id = ?').get(email, household?.id || -1) : null;
 
       req.user = data.user;
       req.userId = data.user.id;
-
-      if (db && FOUNDER_EMAIL && email === FOUNDER_EMAIL) {
-        claimFounderData(db, data.user.id);
-      }
-
+      req.householdId = household?.id || null;
+      req.member = member || null;
       next();
     } catch (err) {
       console.error('[auth] verification error:', err.message);
@@ -76,11 +111,12 @@ function makeRequireAuth({ db } = {}) {
   };
 }
 
-// Backwards-compat default export — unscoped (no claim). Prefer makeRequireAuth({db}).
 const requireAuth = makeRequireAuth();
 
 function getFounderUserId() {
-  return claimedForUserId;
+  // Legacy compat for Phase 1B. Households supersede the per-user founder
+  // pattern but cron still calls saveRecipes() with no req.
+  return null;
 }
 
 module.exports = { requireAuth, makeRequireAuth, getFounderUserId };

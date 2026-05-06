@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { Glass, THEME, display, ambientBG, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+import { isPasskeySupported, getCachedCredentialId, getCachedEmail, authWithPasskey, forgetPasskey } from '../lib/passkeys.js';
 
 const RESEND_COOLDOWN = 60;
 
@@ -85,6 +86,28 @@ export default function Login() {
   const [sending, setSending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [resentAt, setResentAt] = useState(null);
+
+  const passkeyAvailable = isPasskeySupported() && !!getCachedCredentialId();
+  const passkeyEmail = getCachedEmail();
+  const [usingPasskey, setUsingPasskey] = useState(false);
+  const [passkeyError, setPasskeyError] = useState(null);
+
+  async function tryFaceID() {
+    setUsingPasskey(true);
+    setPasskeyError(null);
+    try {
+      await authWithPasskey();
+      // session restored — AuthProvider will pick it up via onAuthStateChange
+    } catch (err) {
+      setPasskeyError(err.message);
+      setUsingPasskey(false);
+    }
+  }
+
+  async function forgetThisDevice() {
+    await forgetPasskey();
+    location.reload();
+  }
 
   useEffect(() => {
     if (!sent || secondsLeft <= 0) return;
@@ -186,6 +209,39 @@ export default function Login() {
               </div>
             ) : (
               <>
+                {passkeyAvailable && (
+                  <div style={{ marginBottom: 18 }}>
+                    <button
+                      onClick={tryFaceID}
+                      disabled={usingPasskey}
+                      style={{
+                        ...glassBtnPrimary,
+                        width: '100%', padding: '14px 16px', fontSize: 15,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        opacity: usingPasskey ? 0.6 : 1,
+                      }}
+                    >
+                      <span style={{ fontSize: 22, lineHeight: 1 }}>👁</span>
+                      {usingPasskey ? 'authenticating…' : `use Face ID${passkeyEmail ? ` · ${passkeyEmail.split('@')[0]}` : ''}`}
+                    </button>
+                    {passkeyError && (
+                      <Glass tint="oklch(0.55 0.18 25 / 0.18)" padding={10} style={{ marginTop: 10 }}>
+                        <div style={{ color: THEME.red, fontSize: 12 }}>⚠ {passkeyError}</div>
+                      </Glass>
+                    )}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 12, marginTop: 12,
+                      fontSize: 11, color: THEME.faint,
+                    }}>
+                      <span>or sign in with email</span>
+                      <button onClick={forgetThisDevice} style={{ background: 'none', border: 'none', color: THEME.faint, cursor: 'pointer', fontSize: 11, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                        forget this device
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {remembered && !showSwitch ? (
                   <>
                     <div style={{

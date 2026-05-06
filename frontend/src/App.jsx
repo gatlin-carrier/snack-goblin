@@ -19,6 +19,9 @@ import { usePrefs } from './lib/prefs.jsx';
 import Login from './components/Login.jsx';
 import Onboarding from './components/Onboarding.jsx';
 import MoodCheckIn from './components/MoodCheckIn.jsx';
+import HouseholdPanel from './components/HouseholdPanel.jsx';
+import PasskeyPrompt from './components/PasskeyPrompt.jsx';
+import { isPasskeySupported, getCachedCredentialId } from './lib/passkeys.js';
 
 const TOP_NAV = [
   { id: 'dashboard', label: 'This Week' },
@@ -70,6 +73,7 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
         <GlassPill onClick={() => settingsHandlers.openNtfy()} title="Notifications">🔔</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="Adult goals">💪</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="Child profile">🧒</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openHousehold()} title="Household">🏠</GlassPill>
         <GlassPill onClick={onSignOut} title="Sign out">↪</GlassPill>
         {showMoreMenu && (
           <div style={{
@@ -135,6 +139,20 @@ export default function App() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [showMood, setShowMood] = useState(false);
+  const [showHousehold, setShowHousehold] = useState(false);
+  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
+
+  // After successful login, offer to set up Face ID — once per device per
+  // session, only if WebAuthn is supported and no passkey is registered yet.
+  useEffect(() => {
+    if (!session || !prefsLoaded) return;
+    if (!prefs.onboarding_complete) return; // wait until onboarding is done
+    if (!isPasskeySupported()) return;
+    if (getCachedCredentialId()) return;
+    if (sessionStorage.getItem('passkey_prompt_skipped')) return;
+    const t = setTimeout(() => setShowPasskeyPrompt(true), 4000);
+    return () => clearTimeout(t);
+  }, [session, prefsLoaded, prefs.onboarding_complete]);
 
   // Mood check-in: once per day on first dashboard visit, only after onboarding
   useEffect(() => {
@@ -204,6 +222,7 @@ export default function App() {
     openIntegrations: () => setShowIntegrations(true),
     openChildProfile: () => setShowChildProfile(true),
     openAdultGoals:   () => setShowAdultGoals(true),
+    openHousehold:    () => setShowHousehold(true),
   };
 
   return (
@@ -241,6 +260,7 @@ export default function App() {
                 <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowAdultGoals(true); setShowMobileMore(false); }}>💪 Adult goals</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowChildProfile(true); setShowMobileMore(false); }}>🧒 Child profile</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowHousehold(true); setShowMobileMore(false); }}>🏠 Household</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 Notifications</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
@@ -268,6 +288,8 @@ export default function App() {
         {showIntegrations && <IntegrationsSettings onClose={() => setShowIntegrations(false)} showToast={showToast} />}
         {showAdultGoals && <AdultGoals onClose={() => setShowAdultGoals(false)} showToast={showToast} />}
         {showChildProfile && <ChildProfile onClose={() => setShowChildProfile(false)} showToast={showToast} />}
+        {showHousehold && <HouseholdPanel onClose={() => setShowHousehold(false)} showToast={showToast} />}
+        {showPasskeyPrompt && <PasskeyPrompt onClose={() => setShowPasskeyPrompt(false)} showToast={showToast} />}
         {showMood && <MoodCheckIn onClose={dismissMood} />}
         {toast && <div className="toast">{toast}</div>}
       </div>
