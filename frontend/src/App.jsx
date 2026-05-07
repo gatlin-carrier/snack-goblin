@@ -11,6 +11,8 @@ import NtfySettings from './components/NtfySettings.jsx';
 import IntegrationsSettings from './components/IntegrationsSettings.jsx';
 import ChildProfile from './components/ChildProfile.jsx';
 import AdultGoals from './components/AdultGoals.jsx';
+import DrinkSettings from './components/DrinkSettings.jsx';
+import GoblinSettings from './components/GoblinSettings.jsx';
 import FirstFoodsLog from './components/FirstFoodsLog.jsx';
 import CollectionsPanel from './components/CollectionsPanel.jsx';
 import { GlassPill, THEME } from './lib/glass.jsx';
@@ -21,6 +23,7 @@ import Onboarding from './components/Onboarding.jsx';
 import MoodCheckIn from './components/MoodCheckIn.jsx';
 import HouseholdPanel from './components/HouseholdPanel.jsx';
 import PasskeyPrompt from './components/PasskeyPrompt.jsx';
+import Goblin from './components/Goblin.jsx';
 import { isPasskeySupported, getCachedCredentialId } from './lib/passkeys.js';
 
 const TOP_NAV = [
@@ -50,9 +53,9 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
   return (
     <header className="glass-topnav">
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, paddingLeft: 8 }}>
-        <div className="glass-logo">
-          <span style={{ marginRight: 6, filter: 'saturate(1.15)' }}>👹</span>
-          Snack Goblins
+        <div className="glass-logo" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Goblin state="idle" size={22} />
+          Snack Goblin
         </div>
         <nav style={{ display: 'flex', gap: 2 }}>
           {TOP_NAV.map(item => (
@@ -73,6 +76,10 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
         <GlassPill onClick={() => settingsHandlers.openNtfy()} title="Notifications">🔔</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="Adult goals">💪</GlassPill>
         <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="Child profile">🧒</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openDrinks()} title="Drinks">🥛</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openGoblin()} title="The goblin" style={{ display: 'flex', alignItems: 'center' }}>
+          <Goblin state="idle" size={18} />
+        </GlassPill>
         <GlassPill onClick={() => settingsHandlers.openHousehold()} title="Household">🏠</GlassPill>
         <GlassPill onClick={onSignOut} title="Sign out">↪</GlassPill>
         {showMoreMenu && (
@@ -88,7 +95,7 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
                 onClick={() => { setView(v.id); onMore(); }}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
-                  background: view === v.id ? 'oklch(0.62 0.14 35 / 0.15)' : 'transparent',
+                  background: view === v.id ? 'oklch(0.55 0.13 50 / 0.15)' : 'transparent',
                   color: view === v.id ? THEME.accent : THEME.ink,
                   border: 'none', borderRadius: 10,
                   padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -140,13 +147,38 @@ export default function App() {
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [showMood, setShowMood] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
+  const [showDrinks, setShowDrinks] = useState(false);
+  const [showGoblin, setShowGoblin] = useState(false);
   const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
 
-  // After successful login, offer to set up Face ID — once per device per
-  // session, only if WebAuthn is supported and no passkey is registered yet.
+  // On first load, save any ?kroger= OAuth callback param to sessionStorage and clean the URL.
+  // A separate effect (below) shows the toast once the session is ready.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kroger = params.get('kroger');
+    if (!kroger) return;
+    params.delete('kroger');
+    window.history.replaceState({}, '', params.toString() ? `?${params}` : window.location.pathname);
+    sessionStorage.setItem('kroger_oauth_result', kroger);
+  }, []);
+
+  // Once session is ready, flush any pending Kroger OAuth toast
+  useEffect(() => {
+    if (!session) return;
+    const result = sessionStorage.getItem('kroger_oauth_result');
+    if (!result) return;
+    sessionStorage.removeItem('kroger_oauth_result');
+    if (result === 'connected') showToast('Kroger account connected. Send your list from the Shopping tab.');
+    if (result === 'error') showToast('Kroger connection failed. Try again from Integrations settings.');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  // After successful login, offer to set up Face ID — mobile only (touch
+  // devices), once per device per session, only if no passkey registered yet.
   useEffect(() => {
     if (!session || !prefsLoaded) return;
-    if (!prefs.onboarding_complete) return; // wait until onboarding is done
+    if (!prefs.onboarding_complete) return;
+    if (!window.matchMedia('(pointer: coarse)').matches) return; // desktop out
     if (!isPasskeySupported()) return;
     if (getCachedCredentialId()) return;
     if (sessionStorage.getItem('passkey_prompt_skipped')) return;
@@ -174,10 +206,7 @@ export default function App() {
     return (
       <>
         <div className="mesh-bg" />
-        <div style={{
-          minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: THEME.dim, gap: 12, position: 'relative',
-        }}>
+        <div className="min-h-screen flex items-center justify-center text-dim gap-3 relative">
           <div className="spinner" /> Loading…
         </div>
       </>
@@ -185,8 +214,6 @@ export default function App() {
   }
   if (!session) return <Login />;
 
-  // First-run onboarding gate. Once prefs load, if onboarding hasn't been
-  // completed (or skipped), block the app behind the onboarding ritual.
   if (prefsLoaded && !prefs.onboarding_complete) {
     return (
       <>
@@ -223,6 +250,8 @@ export default function App() {
     openChildProfile: () => setShowChildProfile(true),
     openAdultGoals:   () => setShowAdultGoals(true),
     openHousehold:    () => setShowHousehold(true),
+    openDrinks:       () => setShowDrinks(true),
+    openGoblin:       () => setShowGoblin(true),
   };
 
   return (
@@ -247,7 +276,7 @@ export default function App() {
           <div className="modal-backdrop" onClick={() => setShowMobileMore(false)}>
             <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <div style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 600, fontStyle: 'italic', color: 'var(--ink)' }}>More</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, fontStyle: 'italic', color: 'var(--color-ink)' }}>More</div>
                 <button className="modal-close" onClick={() => setShowMobileMore(false)}>×</button>
               </div>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -257,26 +286,30 @@ export default function App() {
                     {item.label}
                   </button>
                 ))}
-                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowAdultGoals(true); setShowMobileMore(false); }}>💪 Adult goals</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowChildProfile(true); setShowMobileMore(false); }}>🧒 Child profile</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowDrinks(true); setShowMobileMore(false); }}>🥛 Drinks</button>
+                <button className="btn-ghost" style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowGoblin(true); setShowMobileMore(false); }}>
+                  <Goblin state="idle" size={16} /> The goblin
+                </button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowHousehold(true); setShowMobileMore(false); }}>🏠 Household</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 Notifications</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
-                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
                 <button
                   className="btn-ghost"
                   style={{
                     textAlign: 'left',
-                    background: prefs.low_capacity_mode ? 'oklch(0.78 0.07 145 / 0.18)' : undefined,
+                    background: prefs.low_capacity_mode ? 'oklch(0.78 0.07 50 / 0.18)' : undefined,
                     color: prefs.low_capacity_mode ? THEME.sage : undefined,
                   }}
                   onClick={() => updatePrefs({ low_capacity_mode: !prefs.low_capacity_mode })}
                 >
                   {prefs.low_capacity_mode ? '🌿 low-capacity day · on' : '🌿 low-capacity day · off'}
                 </button>
-                <div style={{ height: 1, background: 'var(--hairline)', margin: '8px 0' }} />
+                <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
                 <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { signOut(); setShowMobileMore(false); }}>↪ Sign out</button>
               </div>
             </div>
@@ -289,6 +322,8 @@ export default function App() {
         {showAdultGoals && <AdultGoals onClose={() => setShowAdultGoals(false)} showToast={showToast} />}
         {showChildProfile && <ChildProfile onClose={() => setShowChildProfile(false)} showToast={showToast} />}
         {showHousehold && <HouseholdPanel onClose={() => setShowHousehold(false)} showToast={showToast} />}
+        {showDrinks && <DrinkSettings onClose={() => setShowDrinks(false)} showToast={showToast} />}
+        {showGoblin && <GoblinSettings onClose={() => setShowGoblin(false)} showToast={showToast} />}
         {showPasskeyPrompt && <PasskeyPrompt onClose={() => setShowPasskeyPrompt(false)} showToast={showToast} />}
         {showMood && <MoodCheckIn onClose={dismissMood} />}
         {toast && <div className="toast">{toast}</div>}

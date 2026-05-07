@@ -12,14 +12,26 @@ const CATEGORY_LABELS = {
 };
 
 export default function ShoppingList({ currentPlan, showToast }) {
-  const [list, setList] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [list, setList]               = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [generating, setGenerating]   = useState(false);
+  const [showStores, setShowStores]   = useState(false);
+  const [storeStatus, setStoreStatus] = useState({ instacart: false, kroger: false, krogerConfigured: false });
+  const [sendingTo, setSendingTo]     = useState(null);
 
   useEffect(() => {
     if (currentPlan?.id) loadList(currentPlan.id);
     else setLoading(false);
   }, [currentPlan?.id]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/retailer/instacart/status').then(r => r.json()).catch(() => ({ configured: false })),
+      fetch('/api/retailer/kroger/status').then(r => r.json()).catch(() => ({ connected: false, configured: false })),
+    ]).then(([ic, kr]) => {
+      setStoreStatus({ instacart: ic.configured, kroger: kr.connected, krogerConfigured: kr.configured });
+    });
+  }, []);
 
   async function loadList(planId) {
     setLoading(true);
@@ -70,6 +82,59 @@ export default function ShoppingList({ currentPlan, showToast }) {
     showToast('copied. paste anywhere.');
   }
 
+  async function sendToInstacart() {
+    setSendingTo('instacart');
+    try {
+      const res = await fetch(`/api/shopping-lists/${list.id}/send/instacart`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Instacart error'); return; }
+      window.open(data.url, '_blank');
+      setShowStores(false);
+      showToast('opening Instacart cart…');
+    } catch {
+      showToast('could not reach Instacart');
+    } finally {
+      setSendingTo(null);
+    }
+  }
+
+  async function sendToKroger() {
+    setSendingTo('kroger');
+    try {
+      const res = await fetch(`/api/shopping-lists/${list.id}/send/kroger`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.reconnect) { showToast('Kroger session expired. Reconnect in Integrations settings.'); }
+        else showToast(data.error || 'Kroger error');
+        return;
+      }
+      window.open(data.url, '_blank');
+      setShowStores(false);
+      showToast(`${data.added} items added to your Kroger cart`);
+    } catch {
+      showToast('could not reach Kroger');
+    } finally {
+      setSendingTo(null);
+    }
+  }
+
+  function searchWalmart() {
+    if (!list?.items) return;
+    const unchecked = list.items.filter(i => !i.checked);
+    const query = unchecked.map(i => i.ingredient_name).join(' ');
+    window.open(`https://www.walmart.com/search?q=${encodeURIComponent(query)}`, '_blank');
+    setShowStores(false);
+  }
+
+  function searchAmazonFresh() {
+    if (!list?.items) return;
+    const unchecked = list.items.filter(i => !i.checked);
+    const query = unchecked.map(i => i.ingredient_name).join(' ');
+    // rh=n:16310101 scopes to Amazon Fresh / grocery
+    window.open(`https://www.amazon.com/s?k=${encodeURIComponent(query)}&rh=n%3A16310101`, '_blank');
+    setShowStores(false);
+  }
+
   if (loading) {
     return <div className="page"><div style={{ color: THEME.dim, display: 'flex', gap: 10 }}><div className="spinner" /> Loading…</div></div>;
   }
@@ -116,9 +181,9 @@ export default function ShoppingList({ currentPlan, showToast }) {
     grouped[cat].push(item);
   }
 
-  const total = list.items.length;
+  const total        = list.items.length;
   const checkedCount = list.items.filter(i => i.checked).length;
-  const allDone = total > 0 && checkedCount === total;
+  const allDone      = total > 0 && checkedCount === total;
 
   return (
     <div className="page">
@@ -145,18 +210,14 @@ export default function ShoppingList({ currentPlan, showToast }) {
           <button style={{ ...glassBtnGhost, opacity: generating ? 0.5 : 1 }} onClick={generate} disabled={generating}>
             {generating ? 'Regenerating…' : '🔄 Regenerate'}
           </button>
-          <button
-            style={{ ...glassBtnGhost, opacity: 0.5 }}
-            title="Apply for Instacart API at developers.instacart.com"
-            disabled
-          >
-            🛒 Instacart (API pending)
+          <button style={glassBtnGhost} onClick={() => setShowStores(true)}>
+            🛒 Send to store
           </button>
         </div>
       </div>
 
       {allDone && (
-        <Glass tint="oklch(0.55 0.10 145 / 0.20)" padding={20} style={{ marginBottom: 22, textAlign: 'center' }}>
+        <Glass tint="oklch(0.55 0.10 50 / 0.20)" padding={20} style={{ marginBottom: 22, textAlign: 'center' }}>
           <div style={{ fontSize: 28, marginBottom: 6 }}>🎉</div>
           <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', color: THEME.ink }}>
             all foraged · go cook something good
@@ -172,7 +233,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
               letterSpacing: '0.16em', textTransform: 'uppercase',
               padding: '14px 16px 10px',
             }}>{CATEGORY_LABELS[cat] || cat}</div>
-            {items.map((item, i) => (
+            {items.map((item) => (
               <label
                 key={item.id}
                 style={{
@@ -192,7 +253,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
                       ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
                       : 'oklch(1 0 0 / 0.55)',
                     boxShadow: item.checked
-                      ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.4)'
+                      ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.35 0.10 50 / 0.4)'
                       : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.2)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, color: 'white', fontWeight: 700,
@@ -212,6 +273,110 @@ export default function ShoppingList({ currentPlan, showToast }) {
             ))}
           </Glass>
         ))}
+      </div>
+
+      {showStores && (
+        <StorePickerModal
+          storeStatus={storeStatus}
+          sendingTo={sendingTo}
+          onInstacart={sendToInstacart}
+          onKroger={sendToKroger}
+          onWalmart={searchWalmart}
+          onAmazonFresh={searchAmazonFresh}
+          onClose={() => setShowStores(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function StorePickerModal({ storeStatus, sendingTo, onInstacart, onKroger, onWalmart, onAmazonFresh, onClose }) {
+  const stores = [
+    {
+      id: 'instacart',
+      name: 'Instacart',
+      logo: '🛒',
+      desc: storeStatus.instacart
+        ? 'Creates a shared cart link with all your items'
+        : 'API key required — apply at developers.instacart.com',
+      available: storeStatus.instacart,
+      onClick: onInstacart,
+    },
+    {
+      id: 'kroger',
+      name: 'Kroger',
+      logo: '🛍',
+      desc: storeStatus.kroger
+        ? 'Adds items directly to your Kroger cart'
+        : storeStatus.krogerConfigured
+          ? 'Connect your Kroger account in Integrations settings'
+          : 'Configure KROGER_CLIENT_ID in environment first',
+      available: storeStatus.kroger,
+      onClick: onKroger,
+    },
+    {
+      id: 'walmart',
+      name: 'Walmart',
+      logo: '🏪',
+      desc: 'Opens walmart.com — search pre-filled with your items',
+      available: true,
+      onClick: onWalmart,
+    },
+    {
+      id: 'amazon',
+      name: 'Amazon Fresh',
+      logo: '📦',
+      desc: 'Opens Amazon Fresh grocery search',
+      available: true,
+      onClick: onAmazonFresh,
+    },
+  ];
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', fontWeight: 500, color: THEME.ink }}>
+            Send to store
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {stores.map(store => {
+            const busy = sendingTo === store.id;
+            return (
+              <button
+                key={store.id}
+                onClick={store.available ? store.onClick : undefined}
+                disabled={!store.available || !!sendingTo}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 16px', textAlign: 'left',
+                  background: store.available ? 'oklch(1 0 0 / 0.55)' : 'oklch(1 0 0 / 0.28)',
+                  border: 'none', borderRadius: 14, cursor: store.available ? 'pointer' : 'default',
+                  fontFamily: 'inherit',
+                  boxShadow: store.available
+                    ? 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)'
+                    : 'none',
+                  opacity: store.available ? 1 : 0.55,
+                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  transition: 'background 150ms ease',
+                }}
+              >
+                <span style={{ fontSize: 26, lineHeight: 1 }}>{store.logo}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: THEME.ink }}>{store.name}</div>
+                  <div style={{ fontSize: 12, color: THEME.dim, marginTop: 2, lineHeight: 1.4 }}>{store.desc}</div>
+                </div>
+                {busy && <div className="spinner" style={{ width: 16, height: 16 }} />}
+                {store.available && !busy && <span style={{ color: THEME.faint, fontSize: 18 }}>›</span>}
+              </button>
+            );
+          })}
+          <div style={{ fontSize: 11, color: THEME.faint, lineHeight: 1.5, marginTop: 4 }}>
+            Walmart and Amazon Fresh open a search — no account needed. Instacart and Kroger create a full cart.
+          </div>
+        </div>
       </div>
     </div>
   );

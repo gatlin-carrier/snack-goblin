@@ -106,7 +106,7 @@ export default function PrepGuide({ planId, onClose }) {
 
           {step === 'done' && guide && (
             <>
-              <Glass tint="oklch(0.62 0.14 35 / 0.14)" padding={16} style={{
+              <Glass tint="oklch(0.55 0.13 50 / 0.14)" padding={16} style={{
                 marginBottom: 22, display: 'flex', gap: 24, flexWrap: 'wrap',
               }}>
                 {[
@@ -171,7 +171,7 @@ export default function PrepGuide({ planId, onClose }) {
               </div>
 
               {guide.notes && (
-                <Glass tint="oklch(0.78 0.09 30 / 0.20)" padding={16} style={{ marginBottom: 18 }}>
+                <Glass tint="oklch(0.78 0.08 50 / 0.20)" padding={16} style={{ marginBottom: 18 }}>
                   <div style={{
                     fontSize: 11, fontWeight: 700, color: THEME.accent,
                     letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8,

@@ -11,6 +11,7 @@ const DEFAULTS = {
   last_mood_at: null,
   excluded_cuisines: [],
   comfort_meal_type: null,
+  goblin_name: 'the goblin',
 };
 
 export function PrefsProvider({ children }) {

@@ -1,32 +1,40 @@
-// Snack Goblins — Liquid Glass primitives.
+// Snack Goblin — Liquid Glass primitives.
 // Apple iOS 26-style translucent surfaces: blurred + saturated backdrop,
 // hairline ring, top inner highlight, soft drop shadow. All warm-light.
+//
+// Color tokens come from @theme in index.css. THEME here mirrors those
+// values for the handful of places that need them in inline boxShadow stacks
+// (which can't reference CSS vars in all browsers). Change the palette in
+// index.css @theme — these stay in sync.
 
 export const THEME = {
-  bg: 'oklch(0.95 0.018 70)',
-  ink: 'oklch(0.22 0.018 50)',
-  text: 'oklch(0.30 0.018 50)',
-  dim: 'oklch(0.50 0.015 50)',
-  faint: 'oklch(0.62 0.015 50)',
-  hairline: 'oklch(0.85 0.012 60 / 0.6)',
-  accent: 'oklch(0.62 0.14 35)',
-  accentSoft: 'oklch(0.78 0.09 30)',
-  rust: 'oklch(0.55 0.16 35)',
-  sage: 'oklch(0.55 0.10 145)',
-  sagePastel: 'oklch(0.78 0.07 145)',
-  butterPastel: 'oklch(0.84 0.08 80)',
-  yellow: 'oklch(0.68 0.13 80)',
-  red: 'oklch(0.55 0.18 25)',
+  bg:           'oklch(0.96 0.022 75)',
+  ink:          'oklch(0.22 0.04 45)',
+  text:         'oklch(0.32 0.035 45)',
+  dim:          'oklch(0.50 0.025 50)',
+  faint:        'oklch(0.62 0.020 55)',
+  hairline:     'oklch(0.82 0.018 65 / 0.6)',
+  accent:       'oklch(0.62 0.17 50)',     // pumpkin orange (primary)
+  accentSoft:   'oklch(0.82 0.10 60)',     // peach cream
+  rust:         'oklch(0.48 0.14 40)',     // burnt sienna (deep accent)
+  sage:         'oklch(0.62 0.17 50)',     // alias of accent (semantic slot)
+  sagePastel:   'oklch(0.86 0.08 70)',     // warm cream-amber
+  butterPastel: 'oklch(0.86 0.08 80)',
+  yellow:       'oklch(0.68 0.13 80)',
+  plum:         'oklch(0.45 0.13 320)',    // mystical goblin secondary
+  plumSoft:     'oklch(0.75 0.08 320)',
+  plumDeep:     'oklch(0.32 0.10 318)',
+  red:          'oklch(0.55 0.20 18)',
 };
 
 export const display = '"Fraunces", Georgia, serif';
 export const body = '"Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
 
 export const ambientBG = `
-  radial-gradient(1100px 700px at 12% 0%, oklch(0.85 0.12 35 / 0.55), transparent 60%),
-  radial-gradient(900px 600px at 100% 18%, oklch(0.82 0.10 80 / 0.45), transparent 65%),
-  radial-gradient(800px 800px at 50% 110%, oklch(0.80 0.08 145 / 0.35), transparent 70%),
-  linear-gradient(180deg, oklch(0.96 0.018 70) 0%, oklch(0.93 0.024 70) 100%)
+  radial-gradient(1100px 700px at 12% 0%,   oklch(0.86 0.10 55 / 0.50), transparent 60%),
+  radial-gradient(900px 600px  at 100% 18%,  oklch(0.84 0.09 75 / 0.40), transparent 65%),
+  radial-gradient(800px 800px  at 50% 110%,  oklch(0.78 0.09 320 / 0.32), transparent 70%),
+  linear-gradient(180deg, oklch(0.97 0.022 75) 0%, oklch(0.94 0.028 70) 100%)
 `;
 
 // ── Liquid Glass surface ──────────────────────────────────────────
@@ -87,11 +95,12 @@ export function GlassPill({ children, active = false, tint, style, onClick, titl
 // ── Badges (uppercase pill — small) ───────────────────────────────
 export function Badge({ children, tone = 'neutral' }) {
   const map = {
-    neutral: { bg: 'oklch(1 0 0 / 0.6)',          fg: THEME.text },
-    accent:  { bg: 'oklch(0.62 0.14 35 / 0.18)',  fg: THEME.accent },
-    sage:    { bg: 'oklch(0.55 0.10 145 / 0.18)', fg: THEME.sage },
-    yellow:  { bg: 'oklch(0.68 0.13 80 / 0.22)',  fg: 'oklch(0.45 0.13 80)' },
-    rust:    { bg: 'oklch(0.55 0.16 35 / 0.18)',  fg: THEME.rust },
+    neutral: { bg: 'oklch(1 0 0 / 0.6)',           fg: THEME.text },
+    accent:  { bg: 'oklch(0.62 0.17 50 / 0.18)',   fg: THEME.accent },
+    sage:    { bg: 'oklch(0.62 0.17 50 / 0.18)',   fg: THEME.accent },
+    yellow:  { bg: 'oklch(0.68 0.13 80 / 0.22)',   fg: 'oklch(0.45 0.13 80)' },
+    rust:    { bg: 'oklch(0.48 0.14 40 / 0.20)',   fg: THEME.rust },
+    plum:    { bg: 'oklch(0.45 0.13 320 / 0.18)',  fg: THEME.plum },
   };
   const c = map[tone] || map.neutral;
   return (
@@ -107,11 +116,7 @@ export function Badge({ children, tone = 'neutral' }) {
 }
 
 // ── Nutrition bar — single calm tone, no traffic-light coding ─────
-// ADHD-friendly: progress is just progress. We don't reward high pct
-// with green or shame low pct with red. The number speaks for itself;
-// the bar is a soft sage fill regardless. Per BRAND.md "Color & nutrition
-// feedback rules" — gentle nudges live in prose, not in color.
-const BAR_FILL = 'oklch(0.78 0.07 145)'; // pastel sage, the same one always
+const BAR_FILL = 'oklch(0.72 0.13 55)'; // warm amber-pumpkin
 
 export function NutritionBar({ label, pct, value, max, unit }) {
   const cap = Math.min(100, Math.max(0, pct || 0));
@@ -130,7 +135,7 @@ export function NutritionBar({ label, pct, value, max, unit }) {
   );
 }
 
-// ── Real food photography (Unsplash CDN) ──────────────────────────
+// ── Food photography ───────────────────────────────────────────────
 const FOOD_PHOTOS_BY_NAME = [
   ['salmon',     'https://images.unsplash.com/photo-1467003909585-2f8a72700288'],
   ['fish',       'https://images.unsplash.com/photo-1467003909585-2f8a72700288'],
@@ -179,7 +184,6 @@ export function photoFor({ name, cuisine, src }) {
 
 export function PhotoBg({ name, cuisine, src, h = 200, label, style, children }) {
   const url = photoFor({ name, cuisine, src });
-  // Pexels URLs are pre-baked; Unsplash URLs need transform params
   const final = url.includes('images.unsplash.com')
     ? `${url}?w=900&q=70&auto=format&fit=crop`
     : url;
@@ -212,8 +216,8 @@ export const glassBtnPrimary = {
   fontFamily: 'inherit',
   boxShadow: [
     'inset 0 1px 0 oklch(1 0 0 / 0.4)',
-    '0 0 0 0.5px oklch(0.4 0.1 35 / 0.5)',
-    '0 6px 14px -6px oklch(0.55 0.16 35 / 0.55)',
+    '0 0 0 0.5px oklch(0.40 0.13 45 / 0.5)',
+    '0 6px 14px -6px oklch(0.48 0.14 40 / 0.55)',
   ].join(', '),
 };
 

@@ -80,7 +80,7 @@ export default function NtfySettings({ onClose, showToast }) {
             </div>
           </div>
 
-          <Glass tint="oklch(0.78 0.09 30 / 0.18)" padding={14} style={{ marginBottom: 22 }}>
+          <Glass tint="oklch(0.78 0.08 50 / 0.18)" padding={14} style={{ marginBottom: 22 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, color: THEME.accent,
               letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8,

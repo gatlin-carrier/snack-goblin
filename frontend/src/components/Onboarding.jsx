@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePrefs } from '../lib/prefs.jsx';
 import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+import Goblin from './Goblin.jsx';
 
 const ENERGY_OPTIONS = [
   { key: 'low',  emoji: '🔋',     label: 'low',  copy: 'most days are tired days. keep it short.' },
@@ -22,10 +23,9 @@ const STEPS = ['energy', 'household', 'hated', 'comfort', 'done'];
 
 function FieldLabel({ children }) {
   return (
-    <div style={{
-      fontSize: 11, color: THEME.dim, marginBottom: 6, fontWeight: 700,
-      textTransform: 'uppercase', letterSpacing: '0.08em',
-    }}>{children}</div>
+    <div className="text-[11px] text-dim font-bold uppercase tracking-[0.08em] mb-1.5">
+      {children}
+    </div>
   );
 }
 
@@ -48,14 +48,12 @@ export default function Onboarding({ onDone }) {
 
   async function finish() {
     setSaving(true);
-    // Persist prefs
     await update({
       energy_level: energy,
       excluded_cuisines: hated ? [hated] : [],
       comfort_meal_type: comfort,
       onboarding_complete: true,
     });
-    // Persist excluded cuisine in preferences table for LLM
     if (hated) {
       try {
         await fetch('/api/preferences', {
@@ -65,7 +63,6 @@ export default function Onboarding({ onDone }) {
         });
       } catch {}
     }
-    // Bulk-invite household members
     if (validInvites.length > 0) {
       try {
         await fetch('/api/household/invite-bulk', {
@@ -100,13 +97,14 @@ export default function Onboarding({ onDone }) {
       <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
         <div className="modal-body" style={{ padding: '32px 28px' }}>
 
-          <div style={{ textAlign: 'center', marginBottom: 22 }}>
-            <div style={{ fontSize: 42, marginBottom: 10 }}>👹</div>
-            <div style={{
-              fontFamily: display, fontSize: 24, fontStyle: 'italic',
-              color: THEME.ink, marginBottom: 6, lineHeight: 1.2,
-            }}>{headlines[stepKey][0]}</div>
-            <div style={{ color: THEME.dim, fontSize: 13, lineHeight: 1.55 }}>
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-2.5">
+              <Goblin state="idle" size={52} />
+            </div>
+            <div style={{ fontFamily: display, fontSize: 24, fontStyle: 'italic', lineHeight: 1.2 }} className="text-ink mb-1.5">
+              {headlines[stepKey][0]}
+            </div>
+            <div className="text-dim text-[13px]" style={{ lineHeight: 1.55 }}>
               {headlines[stepKey][1]}
             </div>
           </div>
@@ -119,7 +117,7 @@ export default function Onboarding({ onDone }) {
                   <button key={o.key} onClick={() => setEnergy(o.key)} style={{
                     display: 'flex', alignItems: 'center', gap: 14,
                     padding: '14px 18px',
-                    background: active ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                    background: active ? 'oklch(0.55 0.13 50 / 0.18)' : 'oklch(1 0 0 / 0.55)',
                     border: 'none', borderRadius: 16, cursor: 'pointer',
                     textAlign: 'left', fontFamily: 'inherit',
                     boxShadow: active
@@ -129,10 +127,10 @@ export default function Onboarding({ onDone }) {
                   }}>
                     <span style={{ fontSize: 22 }}>{o.emoji}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, color: THEME.ink, fontSize: 15 }}>{o.label}</div>
-                      <div style={{ fontSize: 12, color: THEME.dim, marginTop: 2 }}>{o.copy}</div>
+                      <div className="font-bold text-ink text-[15px]">{o.label}</div>
+                      <div className="text-[12px] text-dim mt-0.5">{o.copy}</div>
                     </div>
-                    {active && <span style={{ color: THEME.accent }}>✓</span>}
+                    {active && <span className="text-accent">✓</span>}
                   </button>
                 );
               })}
@@ -158,7 +156,8 @@ export default function Onboarding({ onDone }) {
                   {invites.length > 1 && (
                     <button
                       onClick={() => removeInviteRow(i)}
-                      style={{ background: 'transparent', border: 'none', color: THEME.dim, fontSize: 16, padding: '0 8px 10px', cursor: 'pointer' }}
+                      className="text-dim text-base"
+                      style={{ background: 'transparent', border: 'none', padding: '0 8px 10px', cursor: 'pointer' }}
                     >×</button>
                   )}
                 </div>
@@ -167,8 +166,8 @@ export default function Onboarding({ onDone }) {
                 onClick={addInviteRow}
                 style={{ ...glassBtnGhost, fontSize: 12, alignSelf: 'flex-start', marginTop: 4 }}
               >+ add another</button>
-              <div style={{ textAlign: 'center', fontSize: 12, color: THEME.faint, marginTop: 8 }}>
-                {validInvites.length === 0 ? 'optional · skip if it\'s just you' : `${validInvites.length} ready to invite`}
+              <div className="text-center text-[12px] text-faint mt-2">
+                {validInvites.length === 0 ? "optional · skip if it's just you" : `${validInvites.length} ready to invite`}
               </div>
             </div>
           )}
@@ -192,7 +191,7 @@ export default function Onboarding({ onDone }) {
                 );
               })}
               {hated == null && (
-                <div style={{ width: '100%', textAlign: 'center', fontSize: 12, color: THEME.faint, marginTop: 8 }}>
+                <div className="w-full text-center text-[12px] text-faint mt-2">
                   optional · skip if no strong feelings
                 </div>
               )}
@@ -206,7 +205,7 @@ export default function Onboarding({ onDone }) {
                 return (
                   <button key={o.key} onClick={() => setComfort(active ? null : o.key)} style={{
                     padding: '12px 16px',
-                    background: active ? 'oklch(0.55 0.10 145 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                    background: active ? 'oklch(0.55 0.10 50 / 0.18)' : 'oklch(1 0 0 / 0.55)',
                     border: 'none', borderRadius: 14, cursor: 'pointer',
                     textAlign: 'left', fontFamily: 'inherit',
                     color: THEME.ink, fontSize: 14, fontWeight: 600,
@@ -220,7 +219,7 @@ export default function Onboarding({ onDone }) {
                 );
               })}
               {comfort == null && (
-                <div style={{ textAlign: 'center', fontSize: 12, color: THEME.faint, marginTop: 6 }}>
+                <div className="text-center text-[12px] text-faint mt-1.5">
                   optional · skip if everything's good
                 </div>
               )}
@@ -229,17 +228,17 @@ export default function Onboarding({ onDone }) {
 
           {stepKey === 'done' && (
             <Glass padding={16} style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7 }}>
-                <div>energy default → <strong style={{ color: THEME.ink }}>{ENERGY_OPTIONS.find(o => o.key === energy)?.label}</strong></div>
+              <div className="text-[13px] text-text" style={{ lineHeight: 1.7 }}>
+                <div>energy default → <strong className="text-ink">{ENERGY_OPTIONS.find(o => o.key === energy)?.label}</strong></div>
                 {validInvites.length > 0 && (
                   <div style={{ marginTop: 6 }}>
-                    inviting → <strong style={{ color: THEME.sage }}>
+                    inviting → <strong className="text-sage">
                       {validInvites.map(r => r.display_name || r.email).join(', ')}
                     </strong>
                   </div>
                 )}
-                {hated && <div style={{ marginTop: 6 }}>never suggest → <strong style={{ color: THEME.red }}>{hated}</strong></div>}
-                {comfort && <div style={{ marginTop: 6 }}>comfort → <strong style={{ color: THEME.sage }}>{COMFORT_TYPES.find(o => o.key === comfort)?.label}</strong></div>}
+                {hated && <div style={{ marginTop: 6 }}>never suggest → <strong className="text-red">{hated}</strong></div>}
+                {comfort && <div style={{ marginTop: 6 }}>comfort → <strong className="text-sage">{COMFORT_TYPES.find(o => o.key === comfort)?.label}</strong></div>}
               </div>
             </Glass>
           )}

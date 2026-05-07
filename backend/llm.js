@@ -214,4 +214,51 @@ async function chatWithTools(messages, system, tools, executeTool, settings, { m
   return { reply: fallbackText || 'I ran out of steps. Try a simpler request.', messages, toolCalls: allToolCalls };
 }
 
-module.exports = { chat, chatWithTools, DEFAULT_MODELS };
+/**
+ * Multi-turn chat with conversation history. Cross-provider, no tool use.
+ * Used by the goblin chatbot (free-form chat with persisted history).
+ * @param {Array<{role:'user'|'assistant', content:string}>} messages
+ * @param {object} settings - same shape as chat()
+ * @param {{ maxTokens?: number, systemPrompt?: string }} options
+ * @returns {Promise<string>} assistant reply text
+ */
+async function chatMessages(messages, settings, { maxTokens = 1024, systemPrompt = null } = {}) {
+  const provider = settings.provider || 'anthropic';
+  const model = settings.model || DEFAULT_MODELS[provider];
+
+  switch (provider) {
+    case 'anthropic': {
+      const client = getAnthropicClient(settings.api_key);
+      const req = { model, max_tokens: maxTokens, messages };
+      if (systemPrompt) req.system = systemPrompt;
+      const msg = await client.messages.create(req);
+      return msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    }
+    case 'openai':
+    case 'groq':
+    case 'ollama':
+    case 'lmstudio':
+    case 'custom': {
+      const baseURL = provider === 'groq' ? 'https://api.groq.com/openai/v1' : (settings.ollama_base_url || undefined);
+      const client = getOpenAIClient(settings.api_key || provider, baseURL);
+      const fullMessages = systemPrompt
+        ? [{ role: 'system', content: systemPrompt }, ...messages]
+        : messages;
+      const res = await client.chat.completions.create({ model, max_tokens: maxTokens, messages: fullMessages });
+      return res.choices[0].message.content;
+    }
+    case 'google': {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(settings.api_key);
+      const gmodel = genAI.getGenerativeModel({ model, ...(systemPrompt ? { systemInstruction: systemPrompt } : {}) });
+      const history = messages.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      const last = messages[messages.length - 1];
+      const result = await gmodel.startChat({ history }).sendMessage(last?.content || '');
+      return result.response.text();
+    }
+    default:
+      throw new Error(`Unknown LLM provider for chatMessages: "${provider}"`);
+  }
+}
+
+module.exports = { chat, chatWithTools, chatMessages, DEFAULT_MODELS };

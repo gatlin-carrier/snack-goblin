@@ -1,4 +1,4 @@
-# Snack Goblins — brand & voice guide
+# Snack Goblin — brand & voice guide
 
 A meal planner for ADHD brains. Not "for everyone with a side helping of ADHD"
 — *for ADHD specifically*, with the understanding that what helps an ADHD

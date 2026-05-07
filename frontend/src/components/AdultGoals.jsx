@@ -16,6 +16,7 @@ const PRESETS = [
 
 export default function AdultGoals({ onClose, showToast }) {
   const [goals, setGoals] = useState({ calories: '', protein_g: '', iron_mg: '', dha_mg: '' });
+  const [budget, setBudget] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -27,6 +28,7 @@ export default function AdultGoals({ onClose, showToast }) {
         iron_mg:   data.iron_mg   ?? '',
         dha_mg:    data.dha_mg    ?? '',
       });
+      setBudget(data.weekly_budget_usd > 0 ? String(data.weekly_budget_usd) : '');
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -41,6 +43,8 @@ export default function AdultGoals({ onClose, showToast }) {
       const val = parseFloat(goals[f.key]);
       if (!isNaN(val)) payload[f.key] = val;
     }
+    const budgetNum = parseFloat(budget);
+    payload.weekly_budget_usd = isNaN(budgetNum) ? 0 : Math.max(0, budgetNum);
     if (Object.keys(payload).length === 0) return;
     setSaving(true);
     try {
@@ -116,6 +120,30 @@ export default function AdultGoals({ onClose, showToast }) {
               ))}
             </div>
           )}
+
+          <div style={{ height: 1, background: THEME.hairline, margin: '6px 0 18px' }} />
+
+          <div style={{ marginBottom: 22 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: THEME.accent,
+              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10,
+            }}>Weekly grocery budget</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: THEME.dim, fontSize: 14 }}>$</span>
+              <input
+                type="number"
+                value={budget}
+                onChange={e => setBudget(e.target.value)}
+                placeholder="200"
+                min={0} max={5000} step={5}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 11, color: THEME.faint }}>USD / week</span>
+            </div>
+            <div style={{ fontSize: 11, color: THEME.faint, marginTop: 6, lineHeight: 1.5 }}>
+              soft target — we'll surface it on the dashboard, hint to the recipe generator, and prefer cheaper picks during auto-curate. leave blank to disable.
+            </div>
+          </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button style={{ ...glassBtnGhost, flex: 1 }} onClick={onClose}>Cancel</button>

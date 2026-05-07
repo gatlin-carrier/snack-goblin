@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import CookMode from './CookMode.jsx';
 import EnergyPill from './EnergyPill.jsx';
+import Goblin, { GoblinWidget } from './Goblin.jsx';
+import GoblinChat from './GoblinChat.jsx';
+import DrinkLogger from './DrinkLogger.jsx';
 import { Glass, Badge, NutritionBar, PhotoBg, glassBtnPrimary, glassBtnGhost, THEME, display } from '../lib/glass.jsx';
 import { usePrefs } from '../lib/prefs.jsx';
 
@@ -24,6 +27,8 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   const [adultGoals, setAdultGoals] = useState(null);
   const [cost, setCost] = useState(null);
   const [pickingForMe, setPickingForMe] = useState(false);
+  const [goblin, setGoblin] = useState({ state: 'idle', recipe: null });
+  const [chatOpen, setChatOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 700);
 
   useEffect(() => {
@@ -37,12 +42,13 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   async function loadData() {
     setLoading(true);
     try {
-      const [planRes, histRes, leftRes, streakRes, goalsRes] = await Promise.all([
+      const [planRes, histRes, leftRes, streakRes, goalsRes, goblinRes] = await Promise.all([
         fetch('/api/meal-plans/current'),
         fetch('/api/cook-history?limit=5'),
         fetch('/api/leftovers'),
         fetch('/api/batch-streak'),
         fetch('/api/adult-goals'),
+        fetch('/api/goblin-state'),
       ]);
       const plan = await planRes.json();
       const hist = await histRes.json();
@@ -52,6 +58,8 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
       const streakData = await streakRes.json();
       setMonthCount(streakData.month_count || 0);
       setAdultGoals(await goalsRes.json());
+      const g = await goblinRes.json().catch(() => null);
+      if (g?.state) setGoblin({ state: g.state, recipe: g.recipe });
       if (plan?.id) {
         const [nutData, costData] = await Promise.all([
           fetch(`/api/meal-plans/${plan.id}/nutrition`).then(r => r.json()),
@@ -98,13 +106,17 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   }));
 
   // Nutrition warnings → calmer messaging. On low-capacity days, hide
-  // entirely — no nudging on a rough day.
+  // entirely — no nudging on a rough day. Sugar nudge fires when juice
+  // pushes the toddler near/over the AAP cap.
   let calciumNote = null;
   if (!prefs.low_capacity_mode) {
-    if (nutrition?.pct?.calcium_mg < 75) calciumNote = "calcium's a bit low. yogurt-pasta swap can patch it.";
+    if (nutrition?.drinks?.juice_oz_pct >= 100) calciumNote = "juice is over the AAP cap. swap one cup for water/milk when you can.";
+    else if (nutrition?.pct?.sugar_g >= 100) calciumNote = "sugar's running high. mostly drinks — check the drinks panel.";
+    else if (nutrition?.pct?.calcium_mg < 75) calciumNote = "calcium's a bit low. yogurt-pasta swap can patch it.";
     else if (nutrition?.pct?.dha_mg < 50) calciumNote = "DHA running low. one salmon meal this week would do it.";
     else if (nutrition?.pct?.iron_mg < 50) calciumNote = "iron's a bit low. red meat or lentils when you can.";
   }
+  const drinksLoggerOn = nutrition?.drinks?.logger_enabled;
 
   async function pickForMe() {
     if (!currentPlan?.id || pickingForMe) return;
@@ -128,11 +140,24 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   }
 
   const lowCap = prefs.low_capacity_mode;
+  // CookMode runs entirely client-side, so "cooking" overrides whatever the
+  // server inferred whenever a CookMode session is open on this device.
+  const goblinState = cookingRecipe ? 'cooking' : goblin.state;
+  const goblinRecipe = cookingRecipe ? cookingRecipe.name : goblin.recipe;
 
   // ───────── DESKTOP ─────────
   if (!isMobile) {
     return (
+      <>
+      {chatOpen && <GoblinChat onClose={() => setChatOpen(false)} name={prefs.goblin_name} showToast={showToast} />}
       <div className="page">
+        {/* Goblin widget — top-left mascot per BRAND.md Phase B. Click to chat. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 14, paddingLeft: 4 }}>
+          <GoblinWidget state={goblinState} recipe={goblinRecipe} size={56} name={prefs.goblin_name} onClick={() => setChatOpen(true)} />
+        </div>
+
+        {drinksLoggerOn && <DrinkLogger onChange={loadData} showToast={showToast} />}
+
         {/* Energy / pick-for-me bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 22, flexWrap: 'wrap', paddingLeft: 8 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -151,7 +176,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
               opacity: pickingForMe ? 0.6 : 1,
             }}
           >
-            {pickingForMe ? 'thinking…' : "👹 just pick for me"}
+            {pickingForMe ? 'thinking…' : <><Goblin state="idle" size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} /> just pick for me</>}
           </button>
         </div>
 
@@ -203,6 +228,31 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
                 {planSize} {planSize === 1 ? 'meal' : 'meals'} planned{!prefs.low_capacity_mode && monthCount > 0 ? ` · ${monthCount} ${monthCount === 1 ? 'cook' : 'cooks'} this month` : ''}.
               </b>
             </div>
+            {cost?.budget_usd > 0 && (
+              <div style={{
+                marginTop: 14, paddingTop: 12,
+                borderTop: `1px solid ${THEME.hairline}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: THEME.faint, marginBottom: 4 }}>
+                    Budget
+                  </div>
+                  <div style={{ fontSize: 13, color: THEME.text, fontVariantNumeric: 'tabular-nums' }}>
+                    <b style={{ color: cost.over_budget ? THEME.rust : THEME.ink }}>${cost.total_usd.toFixed(0)}</b>
+                    <span style={{ color: THEME.dim }}> / ${cost.budget_usd.toFixed(0)}</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, marginLeft: 12, height: 6, borderRadius: 999, background: 'oklch(0.4 0.02 60 / 0.10)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(100, cost.budget_pct || 0)}%`,
+                    background: cost.over_budget ? 'oklch(0.55 0.13 50 / 0.6)' : 'oklch(0.78 0.07 50)',
+                    transition: 'width 0.4s',
+                  }} />
+                </div>
+              </div>
+            )}
           </Glass>
         </div>
 
@@ -302,7 +352,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
                   <div style={{
                     position: 'absolute', inset: 0, borderRadius: 16, pointerEvents: 'none',
                     boxShadow: isToday
-                      ? 'inset 0 0 0 1.5px oklch(0.62 0.14 35 / 0.85)'
+                      ? 'inset 0 0 0 1.5px oklch(0.55 0.13 50 / 0.85)'
                       : 'inset 0 0 0 0.5px oklch(0.4 0.02 60 / 0.18)',
                   }} />
                 </div>
@@ -328,6 +378,12 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
                 <NutritionBar label="Vitamin D" pct={nutrition.pct.vitamin_d_iu} value={nutrition.totals.vitamin_d_iu} max={nutrition.rdas.vitamin_d_iu} unit="IU" />
                 {nutrition.totals.zinc_mg !== undefined && <NutritionBar label="Zinc" pct={nutrition.pct.zinc_mg} value={nutrition.totals.zinc_mg} max={nutrition.rdas.zinc_mg} unit="mg" />}
                 {nutrition.totals.choline_mg !== undefined && <NutritionBar label="Choline" pct={nutrition.pct.choline_mg} value={nutrition.totals.choline_mg} max={nutrition.rdas.choline_mg} unit="mg" />}
+                {nutrition.rdas?.added_sugar_g > 0 && (
+                  <NutritionBar label="Sugar (cap)" pct={nutrition.pct.sugar_g} value={nutrition.totals.sugar_g} max={nutrition.rdas.added_sugar_g} unit="g" />
+                )}
+                {nutrition.drinks && (
+                  <NutritionBar label="Juice (≤6 oz/day)" pct={nutrition.drinks.juice_oz_pct} value={nutrition.drinks.contribution.juice_oz} max={nutrition.drinks.juice_cap_weekly_oz} unit="oz" />
+                )}
               </div>
             ) : (
               <div style={{ color: THEME.dim, fontSize: 14, padding: '8px 0 16px' }}>
@@ -365,20 +421,6 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
               </Glass>
             )}
 
-            {streak > 0 && (
-              <Glass padding={22} radius={20} tint="oklch(0.55 0.10 145 / 0.16)">
-                <div style={{ fontSize: 10, color: THEME.sage, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  {streak}-week batch streak 🔥
-                </div>
-                <div style={{ fontFamily: display, fontSize: 18, fontStyle: 'italic', color: THEME.ink, lineHeight: 1.3, marginBottom: 8 }}>
-                  Keep the rhythm.
-                </div>
-                <div style={{ fontSize: 12.5, color: THEME.text, lineHeight: 1.55 }}>
-                  Sunday cook sessions are paying off — every batch buys back hands-on time across the week.
-                </div>
-              </Glass>
-            )}
-
             {nutrition?.adult_totals && adultGoals?.calories && (
               <Glass padding={22} radius={20}>
                 <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12 }}>
@@ -400,12 +442,22 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
           </div>
         </div>
       </div>
+      </>
     );
   }
 
   // ───────── MOBILE ─────────
   return (
+    <>
+    {chatOpen && <GoblinChat onClose={() => setChatOpen(false)} name={prefs.goblin_name} showToast={showToast} />}
     <div className="page">
+      {/* Goblin widget — click to chat */}
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
+        <GoblinWidget state={goblinState} recipe={goblinRecipe} size={44} name={prefs.goblin_name} onClick={() => setChatOpen(true)} />
+      </div>
+
+      {drinksLoggerOn && <DrinkLogger onChange={loadData} showToast={showToast} />}
+
       {/* Energy + pick-for-me */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 18, paddingLeft: 4 }}>
         <EnergyPill compact />
@@ -414,7 +466,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
           disabled={pickingForMe}
           style={{ ...glassBtnPrimary, fontSize: 12, padding: '7px 14px', opacity: pickingForMe ? 0.6 : 1 }}
         >
-          {pickingForMe ? '…' : '👹 pick for me'}
+          {pickingForMe ? '…' : <><Goblin state="idle" size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> pick for me</>}
         </button>
       </div>
 
@@ -481,7 +533,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
           return (
             <div key={i} style={{
               flex: '0 0 130px', position: 'relative', borderRadius: 14, overflow: 'hidden',
-              boxShadow: isToday ? '0 0 0 1.5px oklch(0.62 0.14 35 / 0.7)' : '0 0 0 0.5px oklch(0.4 0.02 60 / 0.14)',
+              boxShadow: isToday ? '0 0 0 1.5px oklch(0.55 0.13 50 / 0.7)' : '0 0 0 0.5px oklch(0.4 0.02 60 / 0.14)',
             }}>
               {dinner ? <PhotoBg name={dinner.name} cuisine={dinner.cuisine} src={dinner.image_url} h={90} /> : <div style={{ height: 90, background: 'oklch(1 0 0 / 0.4)', display: 'grid', placeItems: 'center', color: THEME.faint }}>+</div>}
               <div style={{
@@ -526,5 +578,6 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
         </Glass>
       )}
     </div>
+    </>
   );
 }

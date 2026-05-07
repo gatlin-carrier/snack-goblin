@@ -124,7 +124,7 @@ function EditView({ recipe, onSave, onCancel, saving }) {
               background: THEME.accent, color: 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 8,
-              boxShadow: '0 0 0 0.5px oklch(0.4 0.1 35 / 0.5)',
+              boxShadow: '0 0 0 0.5px oklch(0.35 0.10 50 / 0.5)',
             }}>{i + 1}</div>
             <textarea value={step} onChange={e => updateStep(i, e.target.value)} rows={2}
               style={{ flex: 1, resize: 'vertical' }} />
@@ -313,7 +313,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
                         const inIt = collections.includes(col.id);
                         return (
                           <button key={col.id} onClick={() => toggleCollection(col.id)} style={{
-                            background: inIt ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                            background: inIt ? 'oklch(0.55 0.13 50 / 0.18)' : 'oklch(1 0 0 / 0.55)',
                             border: 'none',
                             color: inIt ? THEME.accent : THEME.text,
                             borderRadius: 999, padding: '4px 12px',
@@ -396,7 +396,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               </div>
 
               {recipe.toddler_notes && (
-                <Glass tint="oklch(0.55 0.10 145 / 0.18)" padding={16} style={{ marginBottom: 16 }}>
+                <Glass tint="oklch(0.55 0.10 50 / 0.18)" padding={16} style={{ marginBottom: 16 }}>
                   <div style={{ fontWeight: 700, marginBottom: 6, color: THEME.ink, fontSize: 13, letterSpacing: '0.04em' }}>
                     👶 Toddler notes
                   </div>
@@ -415,7 +415,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               )}
 
               {recipe.batch_prep_notes && (
-                <Glass tint="oklch(0.78 0.09 30 / 0.22)" padding={16} style={{ marginBottom: 16 }}>
+                <Glass tint="oklch(0.78 0.08 50 / 0.22)" padding={16} style={{ marginBottom: 16 }}>
                   <div style={{ fontWeight: 700, marginBottom: 6, color: THEME.ink, fontSize: 13, letterSpacing: '0.04em' }}>
                     ⚡ Batch prep tip
                   </div>

@@ -129,7 +129,7 @@ export default function HouseholdPanel({ onClose, showToast }) {
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: m.role === 'founder' ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(0.55 0.10 145 / 0.18)',
+                        background: m.role === 'founder' ? 'oklch(0.55 0.13 50 / 0.18)' : 'oklch(0.55 0.10 50 / 0.18)',
                         color: m.role === 'founder' ? THEME.accent : THEME.sage,
                         fontWeight: 700, fontSize: 14,
                       }}>{(m.display_name || m.email)[0]?.toUpperCase()}</div>

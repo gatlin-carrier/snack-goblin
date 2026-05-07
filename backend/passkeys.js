@@ -28,7 +28,7 @@ const {
   verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
 
-const RP_NAME = 'Snack Goblins';
+const RP_NAME = 'Snack Goblin';
 const RP_ID = process.env.PASSKEY_RP_ID || 'meal-planner.lumi-server.dev';
 const ORIGIN = process.env.PASSKEY_ORIGIN || `https://${RP_ID}`;
 

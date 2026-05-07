@@ -32,7 +32,7 @@ function Timer({ seconds, onDone }) {
 
   return (
     <Glass
-      tint={done ? 'oklch(0.55 0.10 145 / 0.18)' : running ? 'oklch(0.62 0.14 35 / 0.14)' : null}
+      tint={done ? 'oklch(0.55 0.10 50 / 0.18)' : running ? 'oklch(0.55 0.13 50 / 0.14)' : null}
       padding={18}
       style={{ marginTop: 18 }}
     >
@@ -198,7 +198,7 @@ export default function CookMode({ recipe, onClose }) {
                         ? `linear-gradient(180deg, color-mix(in oklch, ${THEME.accent} 80%, white 20%), ${THEME.accent})`
                         : 'oklch(1 0 0 / 0.55)',
                       boxShadow: checked
-                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.4)'
+                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.35 0.10 50 / 0.4)'
                         : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 14, color: 'white', fontWeight: 700,
@@ -216,7 +216,7 @@ export default function CookMode({ recipe, onClose }) {
             </Glass>
 
             {recipe.toddler_notes && (
-              <Glass tint="oklch(0.55 0.10 145 / 0.18)" padding={18} style={{ marginTop: 22 }}>
+              <Glass tint="oklch(0.55 0.10 50 / 0.18)" padding={18} style={{ marginTop: 22 }}>
                 <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: THEME.ink, letterSpacing: '0.04em' }}>
                   👶 Toddler prep
                 </div>
@@ -292,7 +292,7 @@ export default function CookMode({ recipe, onClose }) {
             )}
 
             {step === totalSteps - 1 && doneSteps.has(step) && (
-              <Glass tint="oklch(0.55 0.10 145 / 0.22)" padding={28} style={{ marginTop: 24, textAlign: 'center' }}>
+              <Glass tint="oklch(0.55 0.10 50 / 0.22)" padding={28} style={{ marginTop: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 44, marginBottom: 10 }}>🎉</div>
                 <div style={{
                   fontFamily: display, fontWeight: 500, fontStyle: 'italic',
@@ -327,7 +327,7 @@ export default function CookMode({ recipe, onClose }) {
               style={{
                 ...glassBtnPrimary, flex: 2, fontSize: 16, padding: '12px',
                 background: `linear-gradient(180deg, color-mix(in oklch, ${THEME.sage} 75%, white 25%), ${THEME.sage})`,
-                boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 145 / 0.5), 0 6px 14px -6px oklch(0.55 0.10 145 / 0.55)',
+                boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 50 / 0.5), 0 6px 14px -6px oklch(0.55 0.10 50 / 0.55)',
               }}
               onClick={() => { setDoneSteps(s => new Set([...s, step])); markCooked(recipe.id); }}>
               ✓ Finish

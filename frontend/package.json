@@ -8,11 +8,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^11.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "@zxing/browser": "^0.1.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@zxing/browser": "^0.1.5",
-    "@supabase/supabase-js": "^2.45.0",
-    "@simplewebauthn/browser": "^11.0.0"
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",

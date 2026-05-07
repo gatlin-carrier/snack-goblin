@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePrefs } from '../lib/prefs.jsx';
-import { Glass, THEME, display, glassBtnGhost } from '../lib/glass.jsx';
+import { THEME, display, glassBtnGhost } from '../lib/glass.jsx';
+import Goblin from './Goblin.jsx';
 
 const MOODS = [
   { key: 'good', emoji: '🌞', label: 'good',  energy: 'high', copy: "let's cook something fun." },
@@ -28,13 +29,14 @@ export default function MoodCheckIn({ onClose }) {
     <div className="modal-backdrop" onClick={submitting ? undefined : onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         <div className="modal-body" style={{ padding: '32px 28px' }}>
-          <div style={{ textAlign: 'center', marginBottom: 22 }}>
-            <div style={{ fontSize: 38, marginBottom: 12 }}>👹</div>
-            <div style={{
-              fontFamily: display, fontSize: 24, fontStyle: 'italic',
-              color: THEME.ink, marginBottom: 6, lineHeight: 1.2,
-            }}>before i pick — how's today?</div>
-            <div style={{ color: THEME.dim, fontSize: 13, lineHeight: 1.55 }}>
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-3">
+              <Goblin state="curious" size={52} />
+            </div>
+            <div style={{ fontFamily: display, fontSize: 24, fontStyle: 'italic', lineHeight: 1.2 }} className="text-ink mb-1.5">
+              before i pick — how's today?
+            </div>
+            <div className="text-dim text-[13px]" style={{ lineHeight: 1.55 }}>
               one tap. i'll match your energy.
             </div>
           </div>
@@ -51,7 +53,7 @@ export default function MoodCheckIn({ onClose }) {
                     display: 'flex', alignItems: 'center', gap: 14,
                     padding: '14px 18px',
                     background: active
-                      ? 'oklch(0.62 0.14 35 / 0.18)'
+                      ? 'oklch(0.55 0.13 50 / 0.18)'
                       : 'oklch(1 0 0 / 0.55)',
                     border: 'none', borderRadius: 16,
                     cursor: submitting ? 'default' : 'pointer',
@@ -66,10 +68,10 @@ export default function MoodCheckIn({ onClose }) {
                 >
                   <span style={{ fontSize: 28, lineHeight: 1 }}>{m.emoji}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: THEME.ink, fontSize: 15, textTransform: 'lowercase' }}>{m.label}</div>
-                    <div style={{ fontSize: 12, color: THEME.dim, marginTop: 2 }}>{m.copy}</div>
+                    <div className="font-bold text-ink text-[15px] lowercase">{m.label}</div>
+                    <div className="text-[12px] text-dim mt-0.5">{m.copy}</div>
                   </div>
-                  {active && <span style={{ fontSize: 18, color: THEME.accent }}>✓</span>}
+                  {active && <span className="text-[18px] text-accent">✓</span>}
                 </button>
               );
             })}
