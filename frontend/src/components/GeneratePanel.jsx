@@ -139,7 +139,7 @@ export default function GeneratePanel({ onGenerated, onClose }) {
                       textAlign: 'left',
                       fontFamily: 'inherit',
                       boxShadow: active
-                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.4 0.1 35 / 0.5), 0 6px 14px -6px oklch(0.55 0.16 35 / 0.55)'
+                        ? 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.35 0.10 50 / 0.5), 0 6px 14px -6px oklch(0.42 0.10 50 / 0.55)'
                         : 'inset 0 1px 0 oklch(1 0 0 / 0.7), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
                     }}>
                       <div style={{ fontWeight: 700, fontSize: 13 }}>{m.label}</div>
@@ -235,8 +235,8 @@ export default function GeneratePanel({ onGenerated, onClose }) {
                   const status = progress?.steps[m.key] || 'pending';
                   const generated = progress?.generated[m.key];
                   const tint =
-                    status === 'generating' ? 'oklch(0.62 0.14 35 / 0.14)' :
-                    status === 'done'       ? 'oklch(0.55 0.10 145 / 0.14)' :
+                    status === 'generating' ? 'oklch(0.55 0.13 50 / 0.14)' :
+                    status === 'done'       ? 'oklch(0.55 0.10 50 / 0.14)' :
                     status === 'error'      ? 'oklch(0.55 0.18 25 / 0.14)' : null;
                   return (
                     <Glass key={m.key} tint={tint} padding={12} style={{

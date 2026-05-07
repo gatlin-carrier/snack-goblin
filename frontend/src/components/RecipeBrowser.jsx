@@ -137,7 +137,7 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
                   border: 'none', borderRadius: 999,
                   padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   fontFamily: 'inherit',
-                  boxShadow: active ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+                  boxShadow: active ? '0 2px 6px -2px oklch(0.42 0.10 50 / 0.5)' : 'none',
                   transition: 'background 160ms ease',
                 }}
               >{mt.label}</button>
@@ -187,14 +187,14 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
             const active = activeTag === tag;
             return (
               <button key={tag} onClick={() => setActiveTag(t => t === tag ? '' : tag)} style={{
-                background: active ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                background: active ? 'oklch(0.55 0.13 50 / 0.18)' : 'oklch(1 0 0 / 0.55)',
                 border: 'none',
                 color: active ? THEME.accent : THEME.text,
                 borderRadius: 999, padding: '4px 12px',
                 fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                 cursor: 'pointer', fontFamily: 'inherit',
                 boxShadow: active
-                  ? 'inset 0 1px 0 oklch(1 0 0 / 0.85), 0 0 0 0.5px oklch(0.62 0.14 35 / 0.5)'
+                  ? 'inset 0 1px 0 oklch(1 0 0 / 0.85), 0 0 0 0.5px oklch(0.55 0.13 50 / 0.5)'
                   : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12)',
                 backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
                 transition: 'background 160ms ease',

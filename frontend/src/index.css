@@ -1,70 +1,63 @@
-/* Snack Goblins — Liquid Glass / Daylight
-   Warm, low-stakes light theme with iOS 26 liquid-glass surfaces.
-   Designed for ADHD brains: high contrast where it matters, soft
-   everywhere else, no aggressive reds or panicky urgency. */
+/* Snack Goblin — Tavern Goblin palette / Liquid Glass / Daylight
+   Tailwind v4 with @theme for the full oklch design token set.
+   Glass primitives live in lib/glass.jsx (inline boxShadow stacks are
+   kept there — too complex for @apply). Everything else is Tailwind.
+
+   Palette: warm parchment + burnt-orange primary + plum mystical accent.
+   The mascot keeps its sage skin in Goblin.jsx — character art, not chrome. */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@theme {
+  /* ── Palette: Tavern Goblin ─────────────────────────────────── */
+  --color-bg:            oklch(0.96 0.022 75);   /* warm parchment */
+  --color-ink:           oklch(0.22 0.04 45);    /* dark espresso */
+  --color-text:          oklch(0.32 0.035 45);   /* body brown */
+  --color-dim:           oklch(0.50 0.025 50);
+  --color-faint:         oklch(0.62 0.020 55);
+  --color-hairline:      oklch(0.82 0.018 65 / 0.6);
 
-:root {
-  /* Daylight palette (oklch) */
-  --bg: oklch(0.95 0.018 70);
-  --ink: oklch(0.22 0.018 50);
-  --text: oklch(0.30 0.018 50);
-  --dim: oklch(0.50 0.015 50);
-  --faint: oklch(0.62 0.015 50);
-  --hairline: oklch(0.85 0.012 60 / 0.6);
+  --color-accent:        oklch(0.62 0.17 50);    /* pumpkin orange (primary) */
+  --color-accent-soft:   oklch(0.82 0.10 60);    /* peach cream */
+  --color-accent-deep:   oklch(0.48 0.14 40);    /* burnt sienna */
 
-  --accent: oklch(0.62 0.14 35);            /* terracotta */
-  --accent-soft: oklch(0.78 0.09 30);
-  --accent-deep: oklch(0.55 0.16 35);        /* rust */
+  /* "sage" tokens are now warm — kept as semantic slots for soft-success states */
+  --color-sage:          oklch(0.62 0.17 50);    /* alias of accent */
+  --color-sage-pastel:   oklch(0.86 0.08 70);    /* warm cream-amber */
+  --color-butter-pastel: oklch(0.86 0.08 80);
+  --color-yellow:        oklch(0.68 0.13 80);
 
-  --sage: oklch(0.55 0.10 145);
-  --sage-pastel: oklch(0.78 0.07 145);
+  /* Plum / eggplant — the mystical goblin secondary */
+  --color-plum:          oklch(0.45 0.13 320);
+  --color-plum-soft:     oklch(0.75 0.08 320);
+  --color-plum-deep:     oklch(0.32 0.10 318);
 
-  --butter-pastel: oklch(0.84 0.08 80);
-  --yellow: oklch(0.68 0.13 80);
+  --color-red:           oklch(0.55 0.20 18);    /* danger — pushed away from orange */
 
-  --red: oklch(0.55 0.18 25);
+  /* ── Typography ─────────────────────────────────────────────── */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
-  --glass-fill: oklch(1 0 0 / 0.45);
-  --glass-fill-strong: oklch(1 0 0 / 0.62);
-  --glass-blur: blur(28px) saturate(180%);
-  --glass-ring: 0 0 0 0.5px oklch(0.4 0.02 60 / 0.18);
-  --glass-top-highlight: inset 0 1px 0 0 oklch(1 0 0 / 0.7);
-  --glass-bottom-shadow: inset 0 -1px 0 0 oklch(0.4 0.02 60 / 0.06);
-  --glass-drop: 0 8px 28px -10px oklch(0.3 0.04 50 / 0.18);
-  --glass-drop-crisp: 0 2px 6px -2px oklch(0.3 0.04 50 / 0.10);
-
-  --display: 'Fraunces', Georgia, serif;
-  --body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-
-  /* Back-compat shims for existing components that haven't been rewritten yet */
-  --surface: oklch(1 0 0 / 0.55);
-  --surface2: oklch(1 0 0 / 0.40);
-  --border: oklch(0.4 0.02 60 / 0.18);
-  --text-dim: var(--dim);
-  --green: var(--sage);
-  --radius: 22px;
-  --shadow: var(--glass-drop), var(--glass-drop-crisp);
-  --glass-bg: var(--glass-fill);
-  --glass-border: var(--border);
-  --glass-specular: var(--glass-top-highlight);
-  --accent-dim: var(--accent-deep);
+  /* ── Radius ──────────────────────────────────────────────────── */
+  --radius-card: 22px;
+  --radius-pill: 999px;
 }
 
+/* ── Base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Ambient warm-light photographic background — sits behind everything so the glass has color/light to refract */
+/* ── Ambient background mesh ─────────────────────────────────── */
 .mesh-bg {
   position: fixed;
   inset: 0;
@@ -72,434 +65,353 @@ body {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(1100px 700px at 12% 0%, oklch(0.85 0.12 35 / 0.55), transparent 60%),
-    radial-gradient(900px 600px at 100% 18%, oklch(0.82 0.10 80 / 0.45), transparent 65%),
-    radial-gradient(800px 800px at 50% 110%, oklch(0.80 0.08 145 / 0.35), transparent 70%),
-    linear-gradient(180deg, oklch(0.96 0.018 70) 0%, oklch(0.93 0.024 70) 100%);
+    radial-gradient(1100px 700px at 12% 0%,   oklch(0.86 0.10 55 / 0.50), transparent 60%),
+    radial-gradient(900px 600px  at 100% 18%,  oklch(0.84 0.09 75 / 0.40), transparent 65%),
+    radial-gradient(800px 800px  at 50% 110%,  oklch(0.78 0.09 320 / 0.32), transparent 70%),
+    linear-gradient(180deg, oklch(0.97 0.022 75) 0%, oklch(0.94 0.028 70) 100%);
 }
-.mesh-orb { display: none; } /* legacy orbs no longer needed */
+.mesh-orb { display: none; }
 
-/* ── Buttons (liquid glass) ── */
-button {
-  cursor: pointer;
-  border: none;
-  border-radius: 999px;
-  font-size: 13px;
-  font-family: inherit;
-  font-weight: 600;
-  transition: opacity 0.15s, background 0.15s, transform 0.1s, box-shadow 0.15s;
-}
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-button:active:not(:disabled) { transform: scale(0.98); }
+@layer base {
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius-pill);
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    transition: opacity 0.15s, background 0.15s, transform 0.1s, box-shadow 0.15s;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:active:not(:disabled) { transform: scale(0.98); }
 
-input, select, textarea {
-  background: oklch(1 0 0 / 0.55);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 0.5px solid oklch(0.4 0.02 60 / 0.18);
-  border-radius: 12px;
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 14px;
-  padding: 10px 14px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5);
-}
-input:focus, select:focus, textarea:focus {
-  border-color: oklch(0.62 0.14 35 / 0.5);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5), 0 0 0 3px oklch(0.62 0.14 35 / 0.18);
-}
-input::placeholder, textarea::placeholder { color: var(--faint); }
-select option { background: oklch(0.98 0.012 70); color: var(--ink); }
-
-.btn-primary {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 75%, white 25%), var(--accent));
-  color: white;
-  padding: 9px 18px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  border: none;
-  border-radius: 999px;
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.4),
-    0 0 0 0.5px oklch(0.4 0.1 35 / 0.5),
-    0 6px 14px -6px oklch(0.55 0.16 35 / 0.55);
-}
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 85%, white 15%), var(--accent-deep));
+  input, select, textarea {
+    background: oklch(1 0 0 / 0.55);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 0.5px solid oklch(0.4 0.02 60 / 0.18);
+    border-radius: 12px;
+    color: var(--color-ink);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5);
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: oklch(0.62 0.17 50 / 0.5);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5), 0 0 0 3px oklch(0.62 0.17 50 / 0.18);
+  }
+  input::placeholder, textarea::placeholder { color: var(--color-faint); }
+  select option { background: oklch(0.98 0.012 70); color: var(--color-ink); }
 }
 
-.btn-ghost {
-  background: oklch(1 0 0 / 0.55);
-  color: var(--ink);
-  border: none;
-  border-radius: 999px;
-  padding: 9px 16px;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.7),
-    0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
-    0 4px 10px -4px oklch(0.3 0.04 50 / 0.18);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: oklch(1 0 0 / 0.75);
-  color: var(--accent);
+@layer components {
+  /* ── Buttons ─────────────────────────────────────────────────── */
+  .btn-primary {
+    background: linear-gradient(180deg, color-mix(in oklch, var(--color-accent) 75%, white 25%), var(--color-accent));
+    color: white;
+    padding: 9px 18px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border: none;
+    border-radius: var(--radius-pill);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.4),
+      0 0 0 0.5px oklch(0.40 0.13 45 / 0.5),
+      0 6px 14px -6px oklch(0.48 0.14 40 / 0.55);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, color-mix(in oklch, var(--color-accent) 85%, white 15%), var(--color-accent-deep));
+  }
+
+  .btn-ghost {
+    background: oklch(1 0 0 / 0.55);
+    color: var(--color-ink);
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 9px 16px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
+      0 4px 10px -4px oklch(0.3 0.04 50 / 0.18);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: oklch(1 0 0 / 0.75);
+    color: var(--color-accent);
+  }
+
+  .btn-danger {
+    background: oklch(0.95 0.04 18 / 0.6);
+    color: var(--color-red);
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 8px 14px;
+    font-size: 12px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5), 0 0 0 0.5px oklch(0.55 0.20 18 / 0.25);
+  }
+  .btn-danger:hover:not(:disabled) { background: oklch(0.92 0.06 18 / 0.75); }
+
+  /* ── Glass card ─────────────────────────────────────────────── */
+  .card {
+    background: oklch(1 0 0 / 0.45);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border-radius: var(--radius-card);
+    padding: 22px;
+    box-shadow:
+      inset 0 1px 0 0 oklch(1 0 0 / 0.7),
+      inset 0 -1px 0 0 oklch(0.4 0.02 60 / 0.06),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.18),
+      0 8px 28px -10px oklch(0.3 0.04 50 / 0.18),
+      0 2px 6px -2px oklch(0.3 0.04 50 / 0.10);
+    border: none;
+  }
+
+  /* ── Badges ─────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12);
+  }
+  .badge-green  { background: oklch(0.62 0.17 50 / 0.18); color: var(--color-accent-deep); }
+  .badge-yellow { background: oklch(0.68 0.13 80 / 0.22);  color: oklch(0.45 0.13 80); }
+  .badge-red    { background: oklch(0.55 0.20 18 / 0.18);  color: var(--color-red); }
+  .badge-purple { background: oklch(0.55 0.13 320 / 0.18); color: var(--color-plum); }
+
+  /* ── Layout shell ───────────────────────────────────────────── */
+  .layout { min-height: 100vh; position: relative; z-index: 1; }
+  .sidebar, .sidebar-collapse-btn, .sidebar-expand-btn { display: none !important; }
+  .main { min-height: 100vh; overflow-y: auto; }
+
+  .page { padding: 32px 28px 56px; max-width: 1280px; margin: 0 auto; }
+  .page-header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
+  }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 40px; font-weight: 500;
+    letter-spacing: -0.02em; color: var(--color-ink); line-height: 1.05;
+  }
+  .page-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+
+  .section-title {
+    font-size: 10.5px; font-weight: 700; margin-bottom: 14px;
+    color: var(--color-faint); text-transform: uppercase; letter-spacing: 0.16em;
+  }
+
+  .tag {
+    display: inline-block;
+    background: oklch(1 0 0 / 0.55);
+    border: 0.5px solid oklch(0.4 0.02 60 / 0.16);
+    border-radius: var(--radius-pill);
+    padding: 3px 10px; font-size: 11px; color: var(--color-text);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* ── Nutrition bars ─────────────────────────────────────────── */
+  .nutrition-bar-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .nutrition-bar-row  { display: flex; flex-direction: column; gap: 6px; }
+  .nutrition-bar-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+  .nutrition-bar-track { height: 6px; background: oklch(0.4 0.02 60 / 0.10); border-radius: var(--radius-pill); overflow: hidden; }
+  .nutrition-bar-fill  { height: 100%; border-radius: var(--radius-pill); transition: width 0.4s; }
+
+  /* ── Meal carousel ──────────────────────────────────────────── */
+  .meal-carousel {
+    display: flex; gap: 14px; overflow-x: auto;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    padding: 4px 4px 20px; margin-bottom: 24px;
+    scrollbar-width: thin; scrollbar-color: var(--color-hairline) transparent;
+  }
+  .meal-carousel::-webkit-scrollbar { height: 6px; }
+  .meal-carousel::-webkit-scrollbar-thumb { background: var(--color-hairline); border-radius: 3px; }
+
+  .meal-day-card {
+    flex: 0 0 280px; scroll-snap-align: start;
+    background: oklch(1 0 0 / 0.45);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border-radius: var(--radius-card); overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.18),
+      0 8px 28px -10px oklch(0.3 0.04 50 / 0.18);
+  }
+  .meal-day-card.today {
+    flex: 0 0 360px;
+    box-shadow:
+      inset 0 0 0 1.5px oklch(0.62 0.17 50 / 0.85),
+      0 8px 28px -10px oklch(0.3 0.04 50 / 0.18);
+  }
+
+  /* ── Modal ──────────────────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: oklch(0.3 0.04 50 / 0.35);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 20px; animation: modalBackdropIn 0.22s ease-out;
+  }
+  .modal {
+    background: oklch(1 0 0 / 0.62);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-radius: 28px; width: 100%; max-width: 680px;
+    max-height: 85vh; overflow-y: auto;
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.18),
+      0 24px 60px -20px oklch(0.3 0.04 50 / 0.4);
+    transform-origin: center bottom;
+    animation: modalSlideUp 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 24px 24px 0; gap: 12px; }
+  .modal-body { padding: 20px 24px 24px; color: var(--color-text); }
+  .modal-close {
+    background: oklch(1 0 0 / 0.55); border: none; color: var(--color-dim);
+    font-size: 18px; line-height: 1; padding: 6px 12px; border-radius: var(--radius-pill);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12);
+  }
+  .modal-close:hover { background: oklch(1 0 0 / 0.75); color: var(--color-ink); }
+
+  /* ── Spinner ─────────────────────────────────────────────────── */
+  .spinner {
+    display: inline-block; width: 18px; height: 18px;
+    border: 2px solid oklch(0.4 0.02 60 / 0.15);
+    border-top-color: var(--color-accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Toast ──────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: oklch(1 0 0 / 0.7);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-radius: var(--radius-pill); padding: 12px 22px; z-index: 200;
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
+      0 12px 32px -10px oklch(0.3 0.04 50 / 0.4);
+    font-size: 13px; font-weight: 500; color: var(--color-ink);
+    animation: slideUp 0.2s ease;
+  }
+
+  /* ── Top nav ────────────────────────────────────────────────── */
+  .glass-topnav {
+    position: sticky; top: 12px; z-index: 30;
+    margin: 12px 12px 0; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: var(--radius-pill);
+    background: oklch(1 0 0 / 0.55);
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.85),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
+      0 10px 30px -12px oklch(0.3 0.04 50 / 0.22);
+  }
+  .glass-logo {
+    font-family: var(--font-display); font-size: 19px; font-weight: 700;
+    font-style: italic; color: var(--color-ink); letter-spacing: -0.02em;
+  }
+  .glass-logo-dot { color: var(--color-accent); }
+
+  /* ── Mobile tab bar ─────────────────────────────────────────── */
+  .glass-tabbar {
+    position: fixed; bottom: 12px; left: 14px; right: 14px; height: 58px;
+    z-index: 40; border-radius: var(--radius-pill);
+    background: oklch(1 0 0 / 0.6);
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.4 0.02 60 / 0.14),
+      0 12px 28px -10px oklch(0.3 0.04 50 / 0.3);
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    align-items: center; padding-bottom: env(safe-area-inset-bottom);
+  }
+  .glass-tabbar-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: transparent; border: none; color: var(--color-faint);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 0; height: 100%; cursor: pointer;
+  }
+  .glass-tabbar-item.active { color: var(--color-accent); }
+  .glass-tabbar-indicator { width: 18px; height: 3px; border-radius: var(--radius-pill); margin-bottom: 6px; background: transparent; }
+  .glass-tabbar-item.active .glass-tabbar-indicator { background: var(--color-accent); }
+
+  /* ── Recipe card ────────────────────────────────────────────── */
+  .recipe-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.2s; }
+  .recipe-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      0 0 0 0.5px oklch(0.62 0.17 50 / 0.35),
+      0 14px 32px -14px oklch(0.3 0.04 50 / 0.32);
+  }
+  .recipe-card.selected {
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.7),
+      inset 0 0 0 1.5px oklch(0.62 0.17 50 / 0.7),
+      0 8px 28px -10px oklch(0.3 0.04 50 / 0.18);
+  }
 }
 
-.btn-danger {
-  background: oklch(0.95 0.04 25 / 0.6);
-  color: var(--red);
-  border: none;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 12px;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.5), 0 0 0 0.5px oklch(0.55 0.18 25 / 0.25);
-}
-.btn-danger:hover:not(:disabled) { background: oklch(0.92 0.06 25 / 0.75); }
-
-/* ── Glass card primitive (back-compat — direction-b-glass primitives are in lib/glass.jsx) ── */
-.card {
-  background: var(--glass-fill);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: 22px;
-  padding: 22px;
-  box-shadow:
-    var(--glass-top-highlight),
-    var(--glass-bottom-shadow),
-    var(--glass-ring),
-    var(--glass-drop),
-    var(--glass-drop-crisp);
-  border: none;
-}
-
-/* ── Badges (uppercase pill — match BGBadge) ── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12);
-}
-.badge-green  { background: oklch(0.55 0.10 145 / 0.18); color: var(--sage); }
-.badge-yellow { background: oklch(0.68 0.13 80 / 0.22);  color: oklch(0.45 0.13 80); }
-.badge-red    { background: oklch(0.55 0.18 25 / 0.18);  color: var(--red); }
-.badge-purple { background: oklch(0.62 0.14 35 / 0.18);  color: var(--accent); }
-
-/* ── Layout shell (top-nav based, no sidebar) ── */
-.layout {
-  min-height: 100vh;
-  position: relative;
-  z-index: 1;
-  padding-left: 0;
-}
-.layout.sidebar-closed { padding-left: 0; }
-.sidebar, .sidebar-collapse-btn, .sidebar-expand-btn { display: none !important; }
-
-.main { min-height: 100vh; overflow-y: auto; }
-
-.page { padding: 32px 28px 56px; max-width: 1280px; margin: 0 auto; }
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; gap: 16px; flex-wrap: wrap; }
-.page-title {
-  font-family: var(--display);
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  line-height: 1.05;
-}
-.page-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
-
-.section-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  margin-bottom: 14px;
-  color: var(--faint);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-}
-
-.tag {
-  display: inline-block;
-  background: oklch(1 0 0 / 0.55);
-  border: 0.5px solid oklch(0.4 0.02 60 / 0.16);
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 11px;
-  color: var(--text);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-/* ── Nutrition bars (flat, pastel, soft) ── */
-.nutrition-bar-wrap { display: flex; flex-direction: column; gap: 12px; }
-.nutrition-bar-row { display: flex; flex-direction: column; gap: 6px; }
-.nutrition-bar-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
-.nutrition-bar-track {
-  height: 6px;
-  background: oklch(0.4 0.02 60 / 0.10);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.nutrition-bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s; }
-
-/* ── Meal carousel (kept for mobile day list) ── */
-.meal-carousel {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 4px 20px;
-  margin-bottom: 24px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hairline) transparent;
-}
-.meal-carousel::-webkit-scrollbar { height: 6px; }
-.meal-carousel::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 3px; }
-
-.meal-day-card {
-  flex: 0 0 280px;
-  scroll-snap-align: start;
-  background: var(--glass-fill);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow:
-    var(--glass-top-highlight),
-    var(--glass-ring),
-    var(--glass-drop);
-}
-.meal-day-card.today {
-  flex: 0 0 360px;
-  box-shadow:
-    inset 0 0 0 1.5px oklch(0.62 0.14 35 / 0.85),
-    var(--glass-drop);
-}
-
-@media (max-width: 600px) {
-  .meal-carousel { padding: 4px 16px 20px; margin: 0 -16px 24px; scroll-padding: 16px; gap: 12px; }
-  .meal-day-card { flex: 0 0 78%; }
-  .meal-day-card.today { flex: 0 0 92%; }
-}
-
-/* ── Modal ── */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: oklch(0.3 0.04 50 / 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  animation: modalBackdropIn 0.22s ease-out;
-}
-.modal {
-  background: oklch(1 0 0 / 0.62);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-radius: 28px;
-  width: 100%;
-  max-width: 680px;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.7),
-    0 0 0 0.5px oklch(0.4 0.02 60 / 0.18),
-    0 24px 60px -20px oklch(0.3 0.04 50 / 0.4);
-  transform-origin: center bottom;
-  animation: modalSlideUp 0.36s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 24px 24px 0; gap: 12px; }
-.modal-body { padding: 20px 24px 24px; color: var(--text); }
-.modal-close {
-  background: oklch(1 0 0 / 0.55);
-  border: none;
-  color: var(--dim);
-  font-size: 18px;
-  line-height: 1;
-  padding: 6px 12px;
-  border-radius: 999px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12);
-}
-.modal-close:hover { background: oklch(1 0 0 / 0.75); color: var(--ink); }
-
+/* ── Animations ─────────────────────────────────────────────── */
 @keyframes modalBackdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalSlideUp {
   from { transform: translateY(40px) scale(0.97); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
 }
 @keyframes modalBottomSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
   .modal, .modal-backdrop { animation: none; }
 }
 
-/* ── Spinner ── */
-.spinner {
-  display: inline-block;
-  width: 18px; height: 18px;
-  border: 2px solid oklch(0.4 0.02 60 / 0.15);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Toast ── */
-.toast {
-  position: fixed;
-  bottom: 24px; right: 24px;
-  background: oklch(1 0 0 / 0.7);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 999px;
-  padding: 12px 22px;
-  z-index: 200;
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.7),
-    0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
-    0 12px 32px -10px oklch(0.3 0.04 50 / 0.4);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  animation: slideUp 0.2s ease;
-}
-@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-/* ── Floating glass top nav ── */
-.glass-topnav {
-  position: sticky;
-  top: 12px;
-  z-index: 30;
-  margin: 12px 12px 0;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: 999px;
-  background: oklch(1 0 0 / 0.55);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.85),
-    0 0 0 0.5px oklch(0.4 0.02 60 / 0.16),
-    0 10px 30px -12px oklch(0.3 0.04 50 / 0.22);
-}
-.glass-logo {
-  font-family: var(--display);
-  font-size: 19px;
-  font-weight: 700;
-  font-style: italic;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-}
-.glass-logo-dot { color: var(--accent); }
-
-/* ── Glass tab bar (mobile) ── */
-.glass-tabbar {
-  position: fixed;
-  bottom: 12px; left: 14px; right: 14px;
-  height: 58px;
-  z-index: 40;
-  border-radius: 999px;
-  background: oklch(1 0 0 / 0.6);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.7),
-    0 0 0 0.5px oklch(0.4 0.02 60 / 0.14),
-    0 12px 28px -10px oklch(0.3 0.04 50 / 0.3);
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.glass-tabbar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--faint);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0;
-  height: 100%;
-  cursor: pointer;
-}
-.glass-tabbar-item.active { color: var(--accent); }
-.glass-tabbar-indicator {
-  width: 18px;
-  height: 3px;
-  border-radius: 999px;
-  margin-bottom: 6px;
-  background: transparent;
-}
-.glass-tabbar-item.active .glass-tabbar-indicator { background: var(--accent); }
-
-.bottom-nav { display: none; }
-.bottom-nav-item { display: none; }
-
-/* ── Recipe card (back-compat baseline; specific styling moves to RecipeCard.jsx) ── */
-.recipe-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.2s; }
-.recipe-card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    var(--glass-top-highlight),
-    0 0 0 0.5px oklch(0.62 0.14 35 / 0.35),
-    0 14px 32px -14px oklch(0.3 0.04 50 / 0.32);
-}
-.recipe-card.selected {
-  box-shadow:
-    var(--glass-top-highlight),
-    inset 0 0 0 1.5px oklch(0.62 0.14 35 / 0.7),
-    var(--glass-drop);
-}
-
-/* ── Responsive ── */
+/* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .glass-topnav { padding: 8px 12px; }
 }
-
 @media (max-width: 600px) {
   .glass-topnav { display: none; }
-  .glass-tabbar { display: grid; }
-  .main { padding-bottom: 84px; }
-  .page { padding: 14px 14px 24px; }
-  .page-title { font-size: 28px; }
-  .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .grid-auto { grid-template-columns: 1fr; }
-  .toast { right: 14px; left: 14px; bottom: 84px; }
+  .glass-tabbar  { display: grid; }
+  .main          { padding-bottom: 84px; }
+  .page          { padding: 14px 14px 24px; }
+  .page-title    { font-size: 28px; }
+  .page-header   { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .grid-auto     { grid-template-columns: 1fr; }
+  .toast         { right: 14px; left: 14px; bottom: 84px; }
+  .meal-carousel { padding: 4px 16px 20px; margin: 0 -16px 24px; scroll-padding: 16px; gap: 12px; }
+  .meal-day-card { flex: 0 0 78%; }
+  .meal-day-card.today { flex: 0 0 92%; }
   .modal-backdrop { align-items: flex-end; padding: 0; }
   .modal {
-    border-radius: 22px 22px 0 0;
-    max-height: 92vh;
+    border-radius: 22px 22px 0 0; max-height: 92vh;
     animation: modalBottomSheetUp 0.36s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .card { padding: 16px; border-radius: 18px; }

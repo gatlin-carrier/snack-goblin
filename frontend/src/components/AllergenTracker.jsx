@@ -5,8 +5,8 @@ const ALLERGENS = ['Peanuts','Tree Nuts','Eggs','Dairy','Wheat','Soy','Fish','Sh
 
 const STATUS_META = {
   not_introduced: { label: 'Not introduced', tone: 'neutral', tint: null,                            color: THEME.dim,    dot: '○' },
-  introduced:     { label: 'Introduced',     tone: 'accent',  tint: 'oklch(0.62 0.14 35 / 0.12)',    color: THEME.accent, dot: '●' },
-  passed:         { label: 'Passed ✓',       tone: 'sage',    tint: 'oklch(0.55 0.10 145 / 0.14)',   color: THEME.sage,   dot: '●' },
+  introduced:     { label: 'Introduced',     tone: 'accent',  tint: 'oklch(0.55 0.13 50 / 0.12)',    color: THEME.accent, dot: '●' },
+  passed:         { label: 'Passed ✓',       tone: 'sage',    tint: 'oklch(0.55 0.10 50 / 0.14)',   color: THEME.sage,   dot: '●' },
   reaction:       { label: 'Reaction ⚠',     tone: 'rust',    tint: 'oklch(0.55 0.18 25 / 0.14)',    color: THEME.red,    dot: '●' },
 };
 
@@ -165,7 +165,7 @@ export default function AllergenTracker({ showToast }) {
         </div>
       </div>
 
-      <Glass tint="oklch(0.62 0.14 35 / 0.10)" padding={16} style={{ marginBottom: 22 }}>
+      <Glass tint="oklch(0.55 0.13 50 / 0.10)" padding={16} style={{ marginBottom: 22 }}>
         <div style={{ fontSize: 13, lineHeight: 1.6, color: THEME.text }}>
           Track allergen introduction for your toddler. The American Academy of Pediatrics recommends introducing common allergens early and regularly (at least 2–3×/week) to reduce allergy risk. Tap any allergen to log an introduction.
         </div>

@@ -229,7 +229,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                   color: strategy === s.key ? 'white' : THEME.dim,
                   border: 'none', borderRadius: 999, padding: '5px 14px',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                  boxShadow: strategy === s.key ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+                  boxShadow: strategy === s.key ? '0 2px 6px -2px oklch(0.42 0.10 50 / 0.5)' : 'none',
                 }}
               >{s.label}</button>
             ))}
@@ -306,7 +306,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                     height: isToday ? 140 : 88,
                     background: heroImage
                       ? `linear-gradient(180deg, transparent 35%, oklch(0.20 0.02 50 / 0.65) 100%), url("${heroImage}") center/cover`
-                      : `linear-gradient(135deg, oklch(0.85 0.12 35 / 0.4), oklch(0.82 0.10 80 / 0.25))`,
+                      : `linear-gradient(135deg, oklch(0.85 0.10 50 / 0.4), oklch(0.82 0.10 80 / 0.25))`,
                     display: 'flex', alignItems: 'flex-end', padding: '12px 16px',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -321,7 +321,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                       {isToday && (
                         <span style={{
                           fontSize: 10, fontWeight: 700, color: 'white',
-                          background: 'oklch(0.62 0.14 35 / 0.85)',
+                          background: 'oklch(0.55 0.13 50 / 0.85)',
                           padding: '4px 10px', borderRadius: 999,
                           letterSpacing: '0.12em',
                           backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
@@ -460,7 +460,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
                         <div style={{
                           minHeight: 72,
                           background: isTarget
-                            ? 'oklch(0.62 0.14 35 / 0.12)'
+                            ? 'oklch(0.55 0.13 50 / 0.12)'
                             : cell ? 'oklch(1 0 0 / 0.5)' : 'transparent',
                           backdropFilter: cell ? 'blur(12px)' : 'none',
                           WebkitBackdropFilter: cell ? 'blur(12px)' : 'none',
@@ -545,7 +545,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       {swapFromId && alternates.length > 0 && (() => {
         const target = primaries.find(p => p.id === swapFromId);
         return (
-          <Glass tint="oklch(0.62 0.14 35 / 0.12)" padding={16} style={{ marginBottom: 22 }}>
+          <Glass tint="oklch(0.55 0.13 50 / 0.12)" padding={16} style={{ marginBottom: 22 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, color: THEME.ink, fontSize: 13 }}>
                 🔄 Swap "{target?.name}" with…
@@ -615,7 +615,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       )}
 
       {shared.length > 0 && (
-        <Glass tint="oklch(0.78 0.09 30 / 0.18)" padding={16}>
+        <Glass tint="oklch(0.78 0.08 50 / 0.18)" padding={16}>
           <div style={{
             fontSize: 11, fontWeight: 700, color: THEME.accent,
             letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,

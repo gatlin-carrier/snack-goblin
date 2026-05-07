@@ -46,7 +46,7 @@ export default function EnergyPill({ compact = false }) {
               fontSize: compact ? 11 : 12,
               fontWeight: 600, cursor: locked ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
-              boxShadow: active ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+              boxShadow: active ? '0 2px 6px -2px oklch(0.42 0.10 50 / 0.5)' : 'none',
               transition: 'background 160ms ease',
             }}
           >

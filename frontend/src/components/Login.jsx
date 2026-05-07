@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { Glass, THEME, display, ambientBG, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 import { isPasskeySupported, getCachedCredentialId, getCachedEmail, authWithPasskey, forgetPasskey } from '../lib/passkeys.js';
+import Goblin from './Goblin.jsx';
 
 const RESEND_COOLDOWN = 60;
 
@@ -30,8 +31,8 @@ function ResendTimer({ secondsLeft, onResend, sending }) {
         position: 'absolute', inset: 0,
         width: `${pct * 100}%`,
         background: ready
-          ? `linear-gradient(90deg, oklch(0.78 0.07 145 / 0.25), oklch(0.78 0.07 145 / 0.15))`
-          : `linear-gradient(90deg, oklch(0.62 0.14 35 / 0.18), oklch(0.62 0.14 35 / 0.08))`,
+          ? `linear-gradient(90deg, oklch(0.78 0.07 50 / 0.25), oklch(0.78 0.07 50 / 0.15))`
+          : `linear-gradient(90deg, oklch(0.55 0.13 50 / 0.18), oklch(0.55 0.13 50 / 0.08))`,
         transition: 'width 1s linear',
         pointerEvents: 'none',
       }} />
@@ -167,11 +168,13 @@ export default function Login() {
               fontSize: 11, color: THEME.accent, fontWeight: 700,
               letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10,
             }}>welcome to the den</div>
-            <div style={{ fontSize: 48, lineHeight: 1, marginBottom: 8 }}>👹</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <Goblin state="idle" size={86} title="Snack Goblin mascot" />
+            </div>
             <div style={{
               fontFamily: display, fontSize: 44, fontWeight: 400, fontStyle: 'italic',
               color: THEME.ink, lineHeight: 1, letterSpacing: '-0.02em',
-            }}>Snack Goblins</div>
+            }}>Snack Goblin</div>
             <div style={{ color: THEME.dim, fontSize: 14, marginTop: 14, lineHeight: 1.55 }}>
               Dinner planning for ADHD brains.<br />
               <span style={{ color: THEME.faint }}>Sign in and we'll figure out food together.</span>

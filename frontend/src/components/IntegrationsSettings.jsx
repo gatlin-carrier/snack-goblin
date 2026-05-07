@@ -9,6 +9,7 @@ export default function IntegrationsSettings({ onClose, showToast }) {
   const [backfilling, setBackfilling] = useState(false);
   const [priceStatus, setPriceStatus] = useState({ in_progress: false, remaining: 0 });
   const [refreshingPrices, setRefreshingPrices] = useState(false);
+  const [krogerStatus, setKrogerStatus] = useState({ connected: false, configured: false });
 
   useEffect(() => { load(); }, []);
 
@@ -39,14 +40,26 @@ export default function IntegrationsSettings({ onClose, showToast }) {
   }, [priceStatus.in_progress]);
 
   async function load() {
-    const [c, s, p] = await Promise.all([
+    const [c, s, p, k] = await Promise.all([
       fetch('/api/pexels/configured').then(r => r.json()),
       fetch('/api/recipes/backfill-images/status').then(r => r.json()),
       fetch('/api/recipes/refresh-prices/status').then(r => r.json()),
+      fetch('/api/retailer/kroger/status').then(r => r.json()).catch(() => ({ connected: false, configured: false })),
     ]);
     setPexelsConfigured(c.configured);
     setBackfillStatus(s);
     setPriceStatus(p);
+    setKrogerStatus(k);
+  }
+
+  function connectKroger() {
+    window.location.href = '/api/auth/kroger';
+  }
+
+  async function disconnectKroger() {
+    await fetch('/api/auth/kroger/disconnect', { method: 'POST' });
+    setKrogerStatus(s => ({ ...s, connected: false }));
+    showToast('Kroger account disconnected');
   }
 
   async function refreshPrices() {
@@ -176,6 +189,42 @@ export default function IntegrationsSettings({ onClose, showToast }) {
             >
               {refreshingPrices || priceStatus.in_progress ? '⏳ Pricing…' : '✨ Fetch prices now'}
             </button>
+          </Glass>
+
+          <Glass padding={18} style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: THEME.ink }}>🛍 Kroger</div>
+              {krogerStatus.connected ? (
+                <span style={{ fontSize: 11, color: THEME.sage, fontWeight: 700, letterSpacing: '0.06em' }}>● Connected</span>
+              ) : (
+                <span style={{ fontSize: 11, color: THEME.faint, letterSpacing: '0.06em' }}>○ Not connected</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: THEME.text, lineHeight: 1.55, marginBottom: 14 }}>
+              Push your shopping list directly to your Kroger cart. Requires a free Kroger developer account —{' '}
+              register at <a href="https://developer.kroger.com" target="_blank" rel="noreferrer" style={{ color: THEME.accent, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>developer.kroger.com</a>{' '}
+              and add <code style={{ fontSize: 11, background: 'oklch(0 0 0 / 0.06)', padding: '1px 5px', borderRadius: 4 }}>KROGER_CLIENT_ID</code> and{' '}
+              <code style={{ fontSize: 11, background: 'oklch(0 0 0 / 0.06)', padding: '1px 5px', borderRadius: 4 }}>KROGER_CLIENT_SECRET</code> to your <code style={{ fontSize: 11, background: 'oklch(0 0 0 / 0.06)', padding: '1px 5px', borderRadius: 4 }}>.env</code>.
+            </div>
+            {!krogerStatus.configured ? (
+              <div style={{ fontSize: 12, color: THEME.faint, fontStyle: 'italic' }}>
+                Environment variables not set — add them and redeploy to enable.
+              </div>
+            ) : krogerStatus.connected ? (
+              <button
+                style={{ ...glassBtnGhost, fontSize: 12, padding: '6px 14px', color: THEME.red }}
+                onClick={disconnectKroger}
+              >
+                Disconnect Kroger account
+              </button>
+            ) : (
+              <button
+                style={{ ...glassBtnGhost, fontSize: 12, padding: '6px 14px' }}
+                onClick={connectKroger}
+              >
+                Connect Kroger account →
+              </button>
+            )}
           </Glass>
 
           <div style={{ fontSize: 11, color: THEME.faint, lineHeight: 1.55 }}>

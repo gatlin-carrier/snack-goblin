@@ -255,7 +255,7 @@ export default function PantryManager({ showToast }) {
                 color: active ? 'white' : THEME.dim,
                 border: 'none', borderRadius: 999, padding: '6px 16px',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                boxShadow: active ? '0 2px 6px -2px oklch(0.55 0.16 35 / 0.5)' : 'none',
+                boxShadow: active ? '0 2px 6px -2px oklch(0.42 0.10 50 / 0.5)' : 'none',
               }}>
               {t.label}
             </button>

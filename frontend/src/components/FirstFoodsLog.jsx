@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const REACTIONS = [
-  { key: 'none',     label: 'No reaction', tone: 'sage',   color: THEME.sage,                tint: 'oklch(0.55 0.10 145 / 0.14)' },
+  { key: 'none',     label: 'No reaction', tone: 'sage',   color: THEME.sage,                tint: 'oklch(0.55 0.10 50 / 0.14)' },
   { key: 'mild',     label: 'Mild',        tone: 'yellow', color: 'oklch(0.55 0.13 80)',     tint: 'oklch(0.68 0.13 80 / 0.16)'  },
   { key: 'moderate', label: 'Moderate',    tone: 'rust',   color: 'oklch(0.55 0.16 50)',     tint: 'oklch(0.55 0.16 50 / 0.14)'  },
   { key: 'severe',   label: 'Severe',      tone: 'rust',   color: THEME.red,                 tint: 'oklch(0.55 0.18 25 / 0.16)'  },
@@ -114,7 +114,7 @@ export default function FirstFoodsLog({ showToast }) {
       </div>
 
       {showAdd && (
-        <Glass tint="oklch(0.62 0.14 35 / 0.10)" padding={18} style={{ marginBottom: 22 }}>
+        <Glass tint="oklch(0.55 0.13 50 / 0.10)" padding={18} style={{ marginBottom: 22 }}>
           <div style={{
             fontFamily: display, fontSize: 18, fontStyle: 'italic',
             color: THEME.ink, marginBottom: 14,
@@ -130,13 +130,13 @@ export default function FirstFoodsLog({ showToast }) {
                 const active = newFood === f;
                 return (
                   <button key={f} onClick={() => setNewFood(f)} style={{
-                    background: active ? 'oklch(0.62 0.14 35 / 0.18)' : 'oklch(1 0 0 / 0.55)',
+                    background: active ? 'oklch(0.55 0.13 50 / 0.18)' : 'oklch(1 0 0 / 0.55)',
                     border: 'none',
                     color: active ? THEME.accent : THEME.text,
                     borderRadius: 999, padding: '5px 12px',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                     boxShadow: active
-                      ? 'inset 0 1px 0 oklch(1 0 0 / 0.85), 0 0 0 0.5px oklch(0.62 0.14 35 / 0.5)'
+                      ? 'inset 0 1px 0 oklch(1 0 0 / 0.85), 0 0 0 0.5px oklch(0.55 0.13 50 / 0.5)'
                       : 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.12)',
                   }}>{f}</button>
                 );
