@@ -24,7 +24,7 @@ function ResendTimer({ secondsLeft, onResend, sending }) {
         opacity: sending ? 0.6 : 1,
         overflow: 'hidden',
       }}
-      title={ready ? 'Resend the magic link' : `Wait ${secondsLeft}s before resending`}
+      title={ready ? 'resend the magic link' : `wait ${secondsLeft}s before resending`}
     >
       {/* fill bar showing time elapsed */}
       <span aria-hidden="true" style={{
@@ -37,10 +37,10 @@ function ResendTimer({ secondsLeft, onResend, sending }) {
         pointerEvents: 'none',
       }} />
       <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        {sending ? 'Sending…' : ready ? '↻ Resend magic link' : (
+        {sending ? 'sending…' : ready ? '↻ resend magic link' : (
           <>
             <span style={{ fontVariantNumeric: 'tabular-nums', color: THEME.dim }}>
-              Resend in <strong style={{ color: THEME.ink, fontWeight: 700 }}>{secondsLeft}s</strong>
+              resend in <strong style={{ color: THEME.ink, fontWeight: 700 }}>{secondsLeft}s</strong>
             </span>
           </>
         )}
@@ -165,8 +165,9 @@ export default function Login() {
         <div style={{ width: '100%', maxWidth: 420 }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{
-              fontSize: 11, color: THEME.accent, fontWeight: 700,
-              letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10,
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 11, color: THEME.dim, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10,
             }}>welcome to the den</div>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
               <Goblin state="idle" size={86} title="Snack Goblin mascot" />
@@ -174,10 +175,10 @@ export default function Login() {
             <div style={{
               fontFamily: display, fontSize: 44, fontWeight: 400, fontStyle: 'italic',
               color: THEME.ink, lineHeight: 1, letterSpacing: '-0.02em',
-            }}>Snack Goblin</div>
-            <div style={{ color: THEME.dim, fontSize: 14, marginTop: 14, lineHeight: 1.55 }}>
-              Dinner planning for ADHD brains.<br />
-              <span style={{ color: THEME.faint }}>Sign in and we'll figure out food together.</span>
+            }}>snack goblin</div>
+            <div style={{ color: THEME.text, fontSize: 14, marginTop: 14, lineHeight: 1.55, fontStyle: 'italic', fontFamily: display }}>
+              dinner planning for adhd brains.<br />
+              <span style={{ color: THEME.dim }}>sign in and we'll figure out food together.</span>
             </div>
           </div>
 
@@ -188,9 +189,9 @@ export default function Login() {
                 <div style={{
                   fontFamily: display, fontSize: 22, fontStyle: 'italic',
                   color: THEME.ink, marginBottom: 8,
-                }}>Check your email</div>
+                }}>check your email</div>
                 <div style={{ color: THEME.text, fontSize: 13, lineHeight: 1.55, marginBottom: 18 }}>
-                  {resentAt ? 'Resent — t' : 'T'}ap the link in <strong style={{ color: THEME.ink }}>{email}</strong> on this device to sign in.
+                  {resentAt ? 'resent — t' : 't'}ap the link in <strong style={{ color: THEME.ink }}>{email}</strong> on this device to sign in.
                 </div>
 
                 <ResendTimer
@@ -208,7 +209,7 @@ export default function Login() {
                 <button
                   style={{ ...glassBtnGhost, fontSize: 12, marginTop: 14, opacity: 0.85 }}
                   onClick={reset}
-                >Use a different method</button>
+                >use a different method</button>
               </div>
             ) : (
               <>

@@ -20,10 +20,33 @@ const SKIN_DARK = 'oklch(0.58 0.10 145)';       // shadow ear-inner
 const INK = 'oklch(0.22 0.018 50)';             // eyes / mouth
 const BLUSH = 'oklch(0.78 0.10 30 / 0.6)';      // cheek pink
 const ACCENT = 'oklch(0.62 0.14 35)';           // terracotta accents
-const STEAM = 'oklch(0.85 0.012 60 / 0.85)';    // soft steam grey
+const HAT = 'oklch(0.99 0.004 80)';             // chef toque cream-white
+const HAT_BAND = 'oklch(0.93 0.010 80)';        // toque band (slightly darker)
 
-// Shared body (head + ears + cheek-blushes). Drawn once, expression overlaid.
-function Body({ blush = false }) {
+// Chef's toque — sits across the brow, three overlapping puffs on top.
+// Drawn after the head so it occludes the crown.
+function ChefHat() {
+  return (
+    <g>
+      {/* soft shadow where band meets head */}
+      <ellipse cx="50" cy="27" rx="20" ry="2" fill="oklch(0.4 0.02 60 / 0.10)" />
+      {/* band */}
+      <rect x="32" y="22" width="36" height="6" rx="1.5" fill={HAT_BAND} />
+      <rect x="32" y="22" width="36" height="1.5" rx="1" fill="oklch(1 0 0 / 0.55)" />
+      {/* side puffs (back) */}
+      <ellipse cx="38" cy="14" rx="9" ry="9" fill={HAT} />
+      <ellipse cx="62" cy="14" rx="9" ry="9" fill={HAT} />
+      {/* center puff (front, taller) */}
+      <ellipse cx="50" cy="10" rx="11" ry="10" fill={HAT} />
+      {/* tiny highlight on center puff */}
+      <ellipse cx="46" cy="6" rx="4" ry="2.4" fill="oklch(1 0 0 / 0.55)" />
+    </g>
+  );
+}
+
+// Shared body (head + ears + cheek-blushes + optional toque).
+// Drawn once, expression overlaid by each variant.
+function Body({ blush = false, hat = true }) {
   return (
     <g>
       {/* ears (drawn behind head) */}
@@ -41,6 +64,7 @@ function Body({ blush = false }) {
           <ellipse cx="72" cy="62" rx="7" ry="4" fill={BLUSH} />
         </>
       )}
+      {hat && <ChefHat />}
     </g>
   );
 }
@@ -48,7 +72,7 @@ function Body({ blush = false }) {
 function Sleeping() {
   return (
     <>
-      <Body />
+      <Body hat={false} />
       {/* closed-curve eyes */}
       <path d="M34 54 q6 -6 12 0" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
       <path d="M54 54 q6 -6 12 0" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
@@ -85,10 +109,6 @@ function Cooking() {
   return (
     <>
       <Body blush />
-      {/* steam wisps above pot */}
-      <path d="M40 8 q2 4 0 8 q-2 4 0 8" fill="none" stroke={STEAM} strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M50 4 q2 4 0 8 q-2 4 0 8" fill="none" stroke={STEAM} strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M60 8 q2 4 0 8 q-2 4 0 8" fill="none" stroke={STEAM} strokeWidth="2.5" strokeLinecap="round" />
       {/* happy half-moon eyes */}
       <path d="M34 54 q6 6 12 0" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
       <path d="M54 54 q6 6 12 0" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
@@ -192,7 +212,7 @@ const VARIANTS = {
 // the user's chosen name surfaces everywhere.
 export const GOBLIN_COPY = {
   sleeping: (name) => `${name}'s napping. give 'em something to do.`,
-  curious:  (name) => `${name} sees something interesting.`,
+  curious:  (name, recipe) => recipe ? `${name}'s eyeing ${recipe}.` : `${name} sees something interesting.`,
   cooking:  (_name) => "stirring the pot.",
   'well-fed': (name) => `${name}'s content. proud of you.`,
   hungry:   (name) => `${name}'s looking at you funny.`,

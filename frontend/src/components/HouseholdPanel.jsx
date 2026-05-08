@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Glass, Badge, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+import { useAuth } from '../lib/auth.jsx';
+
+const CONFIRM_PHRASE = 'DELETE MY ACCOUNT';
 
 function FieldLabel({ children }) {
   return (
@@ -11,6 +14,7 @@ function FieldLabel({ children }) {
 }
 
 export default function HouseholdPanel({ onClose, showToast }) {
+  const { signOut } = useAuth();
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,6 +23,9 @@ export default function HouseholdPanel({ onClose, showToast }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [showDanger, setShowDanger] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetch('/api/household')
@@ -71,6 +78,31 @@ export default function HouseholdPanel({ onClose, showToast }) {
     const data = await res.json();
     if (res.ok) { setHousehold(data); showToast(`${member.email} removed.`); }
     else showToast(data.error || "couldn't remove");
+  }
+
+  async function deleteAccount() {
+    if (confirmText !== CONFIRM_PHRASE) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: CONFIRM_PHRASE }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "couldn't delete account");
+        setDeleting(false);
+        return;
+      }
+      // Sign out locally so the JWT is dropped before any further requests.
+      try { await signOut(); } catch {}
+      // signOut tears down the auth provider; toast may not render but try anyway.
+      showToast('account deleted. signed out.');
+    } catch {
+      showToast('network error — try again');
+      setDeleting(false);
+    }
   }
 
   return (
@@ -187,6 +219,67 @@ export default function HouseholdPanel({ onClose, showToast }) {
                   </Glass>
                 </div>
               )}
+
+              {(() => {
+                const claimedMembers = household.members.filter(m => m.joined_at).length;
+                const youAreFounder = !!isFounder;
+                const willPromoteHeir = youAreFounder && claimedMembers > 1;
+                const willNukeHousehold = youAreFounder && claimedMembers <= 1;
+                let outcomeNote;
+                if (willPromoteHeir) outcomeNote = "the household stays. the next member who's signed in becomes founder.";
+                else if (willNukeHousehold) outcomeNote = "you're the only signed-in member, so the household and everything in it (recipes, plans, pantry, history) will be deleted too.";
+                else outcomeNote = "you'll be removed from the household. the household and its data stay for the rest of the members.";
+                return (
+                  <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${THEME.hairline}` }}>
+                    <div style={{
+                      fontSize: 11, fontWeight: 700, color: THEME.red,
+                      letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12,
+                    }}>danger zone</div>
+                    {!showDanger ? (
+                      <button
+                        style={{ ...glassBtnGhost, fontSize: 13, color: THEME.red }}
+                        onClick={() => setShowDanger(true)}
+                      >delete my account</button>
+                    ) : (
+                      <Glass tint="oklch(0.55 0.20 18 / 0.10)" padding={16}>
+                        <div style={{ fontSize: 13, color: THEME.ink, lineHeight: 1.55, marginBottom: 10 }}>
+                          this clears your sign-in, passkeys, preferences, goblin chat history, and drink log.
+                        </div>
+                        <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.55, marginBottom: 14 }}>
+                          {outcomeNote}
+                        </div>
+                        <FieldLabel>type <span style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace', color: THEME.red }}>{CONFIRM_PHRASE}</span> to confirm</FieldLabel>
+                        <input
+                          value={confirmText}
+                          onChange={e => setConfirmText(e.target.value)}
+                          placeholder={CONFIRM_PHRASE}
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          style={{ width: '100%', marginBottom: 12, fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: 13 }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            style={{ ...glassBtnGhost, fontSize: 13 }}
+                            onClick={() => { setShowDanger(false); setConfirmText(''); }}
+                            disabled={deleting}
+                          >cancel</button>
+                          <button
+                            style={{
+                              ...glassBtnPrimary, fontSize: 13,
+                              background: `linear-gradient(180deg, color-mix(in oklch, ${THEME.red} 75%, white 25%), ${THEME.red})`,
+                              boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.4), 0 0 0 0.5px oklch(0.40 0.15 18 / 0.5), 0 6px 14px -6px oklch(0.55 0.20 18 / 0.55)',
+                              opacity: (confirmText !== CONFIRM_PHRASE || deleting) ? 0.5 : 1,
+                            }}
+                            disabled={confirmText !== CONFIRM_PHRASE || deleting}
+                            onClick={deleteAccount}
+                          >{deleting ? 'deleting…' : 'delete account'}</button>
+                        </div>
+                      </Glass>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           ) : null}
         </div>

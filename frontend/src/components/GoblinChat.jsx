@@ -74,14 +74,21 @@ export default function GoblinChat({ onClose, name = 'the goblin', showToast }) 
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header" style={{ alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Goblin state="curious" size={36} name={name} />
-            <div>
-              <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', fontWeight: 500, color: THEME.ink, lineHeight: 1.1 }}>
-                Chat with {name}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <Goblin state="curious" size={44} name={name} style={{ flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontFamily: display, fontSize: 22, fontStyle: 'italic', fontWeight: 400,
+                color: THEME.ink, lineHeight: 1.1, letterSpacing: '-0.01em',
+              }}>
+                chat with {name}
               </div>
-              <div style={{ fontSize: 11, color: THEME.faint, marginTop: 2 }}>
-                knows your plan, recent cooks, and drinks settings
+              <div style={{
+                fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                fontSize: 10.5, color: THEME.dim, marginTop: 4,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>
+                knows your plan · recent cooks · drinks
               </div>
             </div>
           </div>
@@ -97,9 +104,13 @@ export default function GoblinChat({ onClose, name = 'the goblin', showToast }) 
           }}
         >
           {loading ? (
-            <div style={{ color: THEME.dim, textAlign: 'center', marginTop: 40 }}>Loading…</div>
+            <div style={{ color: THEME.dim, textAlign: 'center', marginTop: 40 }}>loading…</div>
           ) : messages.length === 0 ? (
-            <div style={{ color: THEME.dim, textAlign: 'center', marginTop: 40, lineHeight: 1.5, fontSize: 13 }}>
+            <div style={{
+              color: THEME.text, textAlign: 'center', marginTop: 40,
+              lineHeight: 1.55, fontSize: 14, fontStyle: 'italic', fontFamily: display,
+              maxWidth: 360, margin: '40px auto 0',
+            }}>
               say hi. ask "what should i cook tonight?", "what's a swap for tonight's recipe?", or anything food-shaped.
             </div>
           ) : (

@@ -3,9 +3,33 @@ import CookMode from './CookMode.jsx';
 import EnergyPill from './EnergyPill.jsx';
 import Goblin, { GoblinWidget } from './Goblin.jsx';
 import GoblinChat from './GoblinChat.jsx';
+import RecipeModal from './RecipeModal.jsx';
 import DrinkLogger from './DrinkLogger.jsx';
 import { Glass, Badge, NutritionBar, PhotoBg, glassBtnPrimary, glassBtnGhost, THEME, display } from '../lib/glass.jsx';
 import { usePrefs } from '../lib/prefs.jsx';
+import { useAuth } from '../lib/auth.jsx';
+
+function greetingFor(date = new Date()) {
+  const h = date.getHours();
+  if (h < 12) return 'good morning';
+  if (h < 18) return 'good afternoon';
+  return 'good evening';
+}
+
+function firstNameFromUser(user) {
+  const md = user?.user_metadata || {};
+  const full = (md.full_name || md.name || '').trim();
+  if (full) return full.split(/\s+/)[0].toLowerCase();
+  const email = (user?.email || '').toLowerCase();
+  if (!email) return 'friend';
+  return email.split('@')[0].split(/[._\-+]/)[0] || 'friend';
+}
+
+function fmtDateMono(d = new Date()) {
+  const day = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d.getDay()];
+  const mon = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][d.getMonth()];
+  return `${day} · ${mon} ${d.getDate()}`;
+}
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -18,6 +42,10 @@ function fmtTimeSaved(min) {
 
 export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, showToast }) {
   const { prefs } = usePrefs();
+  const { user } = useAuth();
+  const greetingName = firstNameFromUser(user);
+  const greetingPhrase = greetingFor();
+  const todayMono = fmtDateMono();
   const [nutrition, setNutrition] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,8 +55,9 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   const [adultGoals, setAdultGoals] = useState(null);
   const [cost, setCost] = useState(null);
   const [pickingForMe, setPickingForMe] = useState(false);
-  const [goblin, setGoblin] = useState({ state: 'idle', recipe: null });
+  const [goblin, setGoblin] = useState({ state: 'idle', recipe: null, recipe_id: null });
   const [chatOpen, setChatOpen] = useState(false);
+  const [revealRecipe, setRevealRecipe] = useState(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 700);
 
   useEffect(() => {
@@ -59,7 +88,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
       setMonthCount(streakData.month_count || 0);
       setAdultGoals(await goalsRes.json());
       const g = await goblinRes.json().catch(() => null);
-      if (g?.state) setGoblin({ state: g.state, recipe: g.recipe });
+      if (g?.state) setGoblin({ state: g.state, recipe: g.recipe, recipe_id: g.recipe_id });
       if (plan?.id) {
         const [nutData, costData] = await Promise.all([
           fetch(`/api/meal-plans/${plan.id}/nutrition`).then(r => r.json()),
@@ -145,15 +174,28 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   const goblinState = cookingRecipe ? 'cooking' : goblin.state;
   const goblinRecipe = cookingRecipe ? cookingRecipe.name : goblin.recipe;
 
+  // Curious goblin clicks reveal the recipe it's eyeing instead of opening
+  // chat — the message "${name}'s eyeing ${recipe}" promises a payoff.
+  async function onGoblinClick() {
+    if (goblinState === 'curious' && goblin.recipe_id) {
+      try {
+        const res = await fetch(`/api/recipes/${goblin.recipe_id}`);
+        if (res.ok) { setRevealRecipe(await res.json()); return; }
+      } catch {}
+    }
+    setChatOpen(true);
+  }
+
   // ───────── DESKTOP ─────────
   if (!isMobile) {
     return (
       <>
       {chatOpen && <GoblinChat onClose={() => setChatOpen(false)} name={prefs.goblin_name} showToast={showToast} />}
+      {revealRecipe && <RecipeModal recipe={revealRecipe} onClose={() => setRevealRecipe(null)} onUpdated={() => loadData()} />}
       <div className="page">
         {/* Goblin widget — top-left mascot per BRAND.md Phase B. Click to chat. */}
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 14, paddingLeft: 4 }}>
-          <GoblinWidget state={goblinState} recipe={goblinRecipe} size={56} name={prefs.goblin_name} onClick={() => setChatOpen(true)} />
+          <GoblinWidget state={goblinState} recipe={goblinRecipe} size={56} name={prefs.goblin_name} onClick={onGoblinClick} />
         </div>
 
         {drinksLoggerOn && <DrinkLogger onChange={loadData} showToast={showToast} />}
@@ -176,57 +218,49 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
               opacity: pickingForMe ? 0.6 : 1,
             }}
           >
-            {pickingForMe ? 'thinking…' : <><Goblin state="idle" size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} /> just pick for me</>}
+            {pickingForMe ? 'thinking…' : <><Goblin state="idle" size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} /> pick for me</>}
           </button>
         </div>
 
         {/* Headline + time-saved */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 24, marginBottom: 28, alignItems: 'flex-end' }}>
           <div style={{ paddingLeft: 8 }}>
-            <div style={{ fontSize: 11, color: THEME.accent, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12 }}>
-              {DAY_LONG[todayIdx]} · this week
+            <div style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 11, color: THEME.dim, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6,
+            }}>
+              {todayMono}{lowCap ? ' · 🌿 low-capacity' : ''}
             </div>
-            {tonight ? (
-              <h1 style={{
-                fontFamily: display, fontSize: 52, fontWeight: 400, fontStyle: 'italic',
-                color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0,
-              }}>
-                {(() => {
-                  const proteinHint = (tonight.name || '').match(/salmon|chicken|lamb|beef|tofu|fish|pork|turkey|shrimp|lentil|chickpea|egg/i);
-                  const protein = proteinHint ? proteinHint[0].toLowerCase() : 'dinner';
-                  const total = (tonight.prep_time_min || 0) + (tonight.cook_time_min || 0);
-                  return <>Tonight, {protein} —<br />
-                    <span style={{ fontStyle: 'normal', fontWeight: 600 }}>
-                      {total ? `${total} minutes flat.` : 'ready when you are.'}
-                    </span>
-                  </>;
-                })()}
-              </h1>
-            ) : (
-              <h1 style={{ fontFamily: display, fontSize: 48, fontWeight: 400, fontStyle: 'italic', color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0 }}>
-                Nothing planned for tonight —<br />
-                <span style={{ fontStyle: 'normal', fontWeight: 600 }}>let's fix that.</span>
-              </h1>
-            )}
+            <h1 style={{
+              fontFamily: display, fontSize: 44, fontWeight: 400, fontStyle: 'italic',
+              color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0,
+            }}>
+              {greetingPhrase}, {greetingName}.
+            </h1>
             <p style={{ fontSize: 15, color: THEME.dim, marginTop: 14, maxWidth: 520, lineHeight: 1.55 }}>
               {tonight
-                ? (tonight.description || 'A balanced meal for the whole family.')
-                : 'Auto-curate a week from your recipes, or browse the library.'}
+                ? (tonight.description || `${(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)} minutes from fridge to plate.`)
+                : "nothing planned tonight — let's fix that."}
             </p>
           </div>
 
-          <Glass padding={22} radius={22}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: THEME.faint, marginBottom: 8 }}>
-              Time saved this week
+          <Glass padding={22} radius={22} tint="oklch(0.86 0.10 70 / 0.55)">
+            <div style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 10.5, color: THEME.rust, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              this week, you saved
             </div>
-            <div style={{ fontFamily: display, fontSize: 56, fontWeight: 600, lineHeight: 1, letterSpacing: '-0.04em', color: THEME.ink, fontVariantNumeric: 'tabular-nums' }}>
-              {ts.h}<span style={{ fontStyle: 'italic', color: THEME.accent }}>h</span> {ts.m}<span style={{ fontStyle: 'italic', color: THEME.accent }}>m</span>
+            <div style={{ fontFamily: display, fontSize: 56, fontWeight: 500, fontStyle: 'italic', lineHeight: 1, letterSpacing: '-0.03em', color: THEME.ink, fontVariantNumeric: 'tabular-nums' }}>
+              {ts.h}h {ts.m}m
             </div>
-            <div style={{ fontSize: 12, color: THEME.dim, marginTop: 8, lineHeight: 1.5 }}>
-              vs cooking everything fresh.{' '}
-              <b style={{ color: THEME.ink }}>
+            <div style={{ fontSize: 12, color: THEME.text, marginTop: 8, lineHeight: 1.5, fontStyle: 'italic', fontFamily: display }}>
+              vs. winging it after work.{' '}
+              <span style={{ fontStyle: 'normal', color: THEME.ink, fontFamily: 'inherit' }}>
                 {planSize} {planSize === 1 ? 'meal' : 'meals'} planned{!prefs.low_capacity_mode && monthCount > 0 ? ` · ${monthCount} ${monthCount === 1 ? 'cook' : 'cooks'} this month` : ''}.
-              </b>
+              </span>
             </div>
             {cost?.budget_usd > 0 && (
               <div style={{
@@ -268,12 +302,12 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
             <div style={{ position: 'absolute', left: 28, bottom: 28, right: 28, display: 'flex', gap: 16, alignItems: 'flex-end' }}>
               <Glass padding={24} radius={22} strong style={{ flex: 1, maxWidth: 560 }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <Badge tone="accent">Tonight</Badge>
+                  <Badge tone="accent">tonight</Badge>
                   {tonight.cuisine && <Badge>{tonight.cuisine}</Badge>}
-                  {tonight.toddler_safe && <Badge tone="sage">Toddler OK</Badge>}
-                  {(tonight.choking_hazards?.length > 0) && <Badge tone="yellow">Prep needed</Badge>}
+                  {tonight.toddler_safe && <Badge tone="sage">toddler ok</Badge>}
+                  {(tonight.choking_hazards?.length > 0) && <Badge tone="yellow">prep needed</Badge>}
                 </div>
-                <h2 style={{ fontFamily: display, fontSize: 30, fontWeight: 500, color: THEME.ink, lineHeight: 1.1, letterSpacing: '-0.015em', margin: 0, marginBottom: 10 }}>
+                <h2 style={{ fontFamily: display, fontSize: 30, fontWeight: 500, fontStyle: 'italic', color: THEME.ink, lineHeight: 1.1, letterSpacing: '-0.015em', margin: 0, marginBottom: 10 }}>
                   {tonight.name}
                 </h2>
                 {tonight.description && (
@@ -282,14 +316,14 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
                   </p>
                 )}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={glassBtnPrimary} onClick={() => setCookingRecipe(tonight)}>Start cooking →</button>
-                  <button style={glassBtnGhost} onClick={() => onNavigate('plan')}>Swap meal</button>
+                  <button style={glassBtnPrimary} onClick={() => setCookingRecipe(tonight)}>start cooking →</button>
+                  <button style={glassBtnGhost} onClick={() => onNavigate('plan')}>swap</button>
                 </div>
               </Glass>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[
-                  { k: 'Hands-on', v: tonight.prep_time_min ? `${tonight.prep_time_min}m` : '—' },
-                  { k: 'Total',    v: `${(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)}m` },
+                  { k: 'hands-on', v: tonight.prep_time_min ? `${tonight.prep_time_min}m` : '—' },
+                  { k: 'total',    v: `${(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)}m` },
                   { k: '/srv',     v: tonight.cost_per_serving != null ? `$${Math.round(tonight.cost_per_serving)}` : '—' },
                 ].map(s => (
                   <Glass key={s.k} padding={'14px 18px'} radius={16} style={{ minWidth: 92 }}>
@@ -307,10 +341,10 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
         {/* Week — glass tiles with photo + caption */}
         <div style={{ marginBottom: 40 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, paddingLeft: 8, paddingRight: 8 }}>
-            <h3 style={{ fontFamily: display, fontSize: 26, fontWeight: 500, color: THEME.ink, margin: 0, letterSpacing: '-0.015em' }}>
-              The week in dinners
+            <h3 style={{ fontFamily: display, fontSize: 26, fontWeight: 500, fontStyle: 'italic', color: THEME.ink, margin: 0, letterSpacing: '-0.015em' }}>
+              this week
             </h3>
-            <button onClick={() => onNavigate('plan')} style={{ background: 'transparent', border: 'none', fontSize: 12, color: THEME.accent, fontWeight: 600, cursor: 'pointer' }}>Edit plan →</button>
+            <button onClick={() => onNavigate('plan')} style={{ background: 'transparent', border: 'none', fontSize: 12, color: THEME.accent, fontWeight: 600, cursor: 'pointer' }}>full plan →</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, alignItems: 'stretch' }}>
             {DAYS.map((d, i) => {
@@ -365,8 +399,8 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
           <Glass padding={28} radius={22}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 18 }}>
-              <h3 style={{ fontFamily: display, fontSize: 22, fontWeight: 500, color: THEME.ink, margin: 0 }}>
-                Toddler nutrition
+              <h3 style={{ fontFamily: display, fontSize: 22, fontWeight: 500, fontStyle: 'italic', color: THEME.ink, margin: 0 }}>
+                toddler nutrition
               </h3>
               <span style={{ fontSize: 11, color: THEME.faint }}>weekly target coverage</span>
             </div>
@@ -400,10 +434,15 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {expiring.length > 0 && (
-              <Glass padding={22} radius={20}>
-                <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Use up soon
+              <Glass padding={22} radius={20} tint="oklch(0.84 0.10 30 / 0.40)">
+                <div style={{ fontFamily: display, fontStyle: 'italic', fontSize: 20, color: THEME.ink, marginBottom: 4 }}>
+                  use up soon
                 </div>
+                <div style={{
+                  fontSize: 11, color: THEME.rust, fontWeight: 500,
+                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                  letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12,
+                }}>before they walk out</div>
                 {expiring.slice(0, 4).map((l, i, arr) => (
                   <div key={l.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -423,8 +462,8 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
 
             {nutrition?.adult_totals && adultGoals?.calories && (
               <Glass padding={22} radius={20}>
-                <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12 }}>
-                  Your nutrition (avg per day)
+                <div style={{ fontFamily: display, fontStyle: 'italic', fontSize: 20, color: THEME.ink, marginBottom: 12 }}>
+                  your goals
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
@@ -450,10 +489,11 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
   return (
     <>
     {chatOpen && <GoblinChat onClose={() => setChatOpen(false)} name={prefs.goblin_name} showToast={showToast} />}
+    {revealRecipe && <RecipeModal recipe={revealRecipe} onClose={() => setRevealRecipe(null)} onUpdated={() => loadData()} />}
     <div className="page">
       {/* Goblin widget — click to chat */}
       <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 12 }}>
-        <GoblinWidget state={goblinState} recipe={goblinRecipe} size={44} name={prefs.goblin_name} onClick={() => setChatOpen(true)} />
+        <GoblinWidget state={goblinState} recipe={goblinRecipe} size={44} name={prefs.goblin_name} onClick={onGoblinClick} />
       </div>
 
       {drinksLoggerOn && <DrinkLogger onChange={loadData} showToast={showToast} />}
@@ -470,62 +510,79 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
         </button>
       </div>
 
-      <div style={{ fontSize: 10, color: THEME.accent, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
-        {DAY_LONG[todayIdx]} · this week{lowCap ? ' · 🌿 low-capacity' : ''}
+      <div style={{
+        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        fontSize: 10, color: THEME.dim, fontWeight: 500,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        marginBottom: 4, paddingLeft: 4,
+      }}>
+        {todayMono}{lowCap ? ' · 🌿 low-capacity' : ''}
       </div>
-      {tonight ? (
-        <h1 style={{ fontFamily: display, fontSize: 28, fontWeight: 500, color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0, marginBottom: 16, paddingLeft: 4 }}>
-          Tonight, {(tonight.name || '').split(' ').slice(-1)[0].toLowerCase()} —
-          <br />
-          <span style={{ fontStyle: 'italic', color: THEME.accent }}>
-            {(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)} min flat.
-          </span>
-        </h1>
-      ) : (
-        <h1 style={{ fontFamily: display, fontSize: 28, fontWeight: 500, color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em', margin: 0, marginBottom: 16, paddingLeft: 4 }}>
-          Nothing tonight —<br /><span style={{ fontStyle: 'italic', color: THEME.accent }}>plan it now.</span>
-        </h1>
-      )}
+      <h1 style={{
+        fontFamily: display, fontSize: 28, fontWeight: 400, fontStyle: 'italic',
+        color: THEME.ink, lineHeight: 1.1, letterSpacing: '-0.02em',
+        margin: 0, marginBottom: 16, paddingLeft: 4,
+      }}>
+        {greetingPhrase}, {greetingName}.
+      </h1>
 
-      {tonight && (
+      {tonight ? (
         <Glass padding={16} radius={20} strong style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <Badge tone="accent">Tonight</Badge>
+            <Badge tone="accent">tonight</Badge>
             {tonight.cuisine && <Badge>{tonight.cuisine}</Badge>}
           </div>
-          <h2 style={{ fontFamily: display, fontSize: 22, fontWeight: 500, color: THEME.ink, lineHeight: 1.15, margin: 0, marginBottom: 12 }}>
+          <h2 style={{ fontFamily: display, fontSize: 22, fontWeight: 500, fontStyle: 'italic', color: THEME.ink, lineHeight: 1.15, margin: 0, marginBottom: 12 }}>
             {tonight.name}
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
             {[
-              ['Hands-on', tonight.prep_time_min ? `${tonight.prep_time_min}m` : '—'],
-              ['Total',    `${(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)}m`],
+              ['hands-on', tonight.prep_time_min ? `${tonight.prep_time_min}m` : '—'],
+              ['total',    `${(tonight.prep_time_min || 0) + (tonight.cook_time_min || 0)}m`],
               ['/srv',     tonight.cost_per_serving != null ? `$${Math.round(tonight.cost_per_serving)}` : '—'],
             ].map(([k, v]) => (
               <div key={k} style={{
                 background: 'oklch(1 0 0 / 0.55)', borderRadius: 10, padding: '8px 10px',
                 boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.7), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.1)',
               }}>
-                <div style={{ fontSize: 9.5, color: THEME.dim, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase' }}>{k}</div>
+                <div style={{
+                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                  fontSize: 9.5, color: THEME.dim, fontWeight: 500,
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                }}>{k}</div>
                 <div style={{ fontFamily: display, fontSize: 18, fontWeight: 600, color: THEME.ink }}>{v}</div>
               </div>
             ))}
           </div>
-          <button style={{ ...glassBtnPrimary, width: '100%' }} onClick={() => setCookingRecipe(tonight)}>Start cooking →</button>
+          <button style={{ ...glassBtnPrimary, width: '100%' }} onClick={() => setCookingRecipe(tonight)}>start cooking →</button>
+        </Glass>
+      ) : (
+        <Glass padding={16} radius={20} strong style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: display, fontSize: 18, fontStyle: 'italic', color: THEME.ink, marginBottom: 12 }}>
+            nothing planned tonight — let's fix that.
+          </div>
+          <button style={{ ...glassBtnPrimary, width: '100%' }} onClick={() => onNavigate('plan')}>open the plan →</button>
         </Glass>
       )}
 
-      <Glass padding={16} radius={18} style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8 }}>
-          Time saved
+      <Glass padding={16} radius={18} tint="oklch(0.86 0.10 70 / 0.55)" style={{ marginBottom: 14 }}>
+        <div style={{
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 10, color: THEME.rust, fontWeight: 500,
+          letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6,
+        }}>
+          this week, you saved
         </div>
-        <div style={{ fontFamily: display, fontSize: 38, fontWeight: 600, color: THEME.ink, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-          {ts.h}<span style={{ fontStyle: 'italic', color: THEME.accent }}>h</span> {ts.m}<span style={{ fontStyle: 'italic', color: THEME.accent }}>m</span>
+        <div style={{ fontFamily: display, fontSize: 38, fontWeight: 500, fontStyle: 'italic', color: THEME.ink, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+          {ts.h}h {ts.m}m
         </div>
-        <div style={{ fontSize: 11, color: THEME.dim, marginTop: 4 }}>{planSize} {planSize === 1 ? 'meal' : 'meals'} planned</div>
+        <div style={{ fontSize: 11, color: THEME.text, marginTop: 4, fontStyle: 'italic', fontFamily: display }}>{planSize} {planSize === 1 ? 'meal' : 'meals'} planned</div>
       </Glass>
 
-      <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>The week</div>
+      <div style={{
+        fontFamily: display, fontSize: 18, fontStyle: 'italic',
+        color: THEME.ink, marginBottom: 8, paddingLeft: 4,
+      }}>this week</div>
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginBottom: 16, marginLeft: -14, paddingLeft: 14, marginRight: -14, paddingRight: 14, paddingBottom: 4 }}>
         {DAYS.map((d, i) => {
           const dinner = (byDay[i] || []).find(m => m.meal_type === 'dinner') || (byDay[i] || [])[0];
@@ -555,7 +612,7 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
 
       {nutrition && items.length > 0 && (
         <Glass padding={16} radius={18} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 12 }}>Toddler nutrition</div>
+          <div style={{ fontFamily: display, fontSize: 17, fontStyle: 'italic', color: THEME.ink, marginBottom: 12 }}>toddler nutrition</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <NutritionBar label="Iron"    pct={nutrition.pct.iron_mg}    value={nutrition.totals.iron_mg}    max={nutrition.rdas.iron_mg} unit="mg" />
             <NutritionBar label="DHA"     pct={nutrition.pct.dha_mg}     value={nutrition.totals.dha_mg}     max={nutrition.rdas.dha_mg} unit="mg" />
@@ -565,8 +622,13 @@ export default function Dashboard({ currentPlan, setCurrentPlan, onNavigate, sho
       )}
 
       {expiring.length > 0 && (
-        <Glass padding={16} radius={18}>
-          <div style={{ fontSize: 10, color: THEME.faint, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 8 }}>Use up soon</div>
+        <Glass padding={16} radius={18} tint="oklch(0.84 0.10 30 / 0.40)">
+          <div style={{ fontFamily: display, fontSize: 17, fontStyle: 'italic', color: THEME.ink, marginBottom: 2 }}>use up soon</div>
+          <div style={{
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 10, color: THEME.rust, fontWeight: 500,
+            letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10,
+          }}>before they walk out</div>
           {expiring.slice(0, 3).map(l => (
             <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', fontSize: 13 }}>
               <span style={{ flex: 1, fontFamily: display, fontStyle: 'italic', color: THEME.ink }}>{l.recipe_name}</span>

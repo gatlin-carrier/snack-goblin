@@ -171,13 +171,14 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       <div className="page-header">
         <div>
           <div style={{
-            fontSize: 11, color: THEME.accent, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
-          }}>The week ahead</div>
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 11, color: THEME.dim, fontWeight: 500,
+            letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4,
+          }}>this week</div>
           <div style={{
             fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
-            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
-          }}>Meal plan</div>
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em',
+          }}>plan, with the pots in mind.</div>
           <div style={{ color: THEME.dim, fontSize: 13, marginTop: 6 }}>
             {filledSlots} of 28 slots filled
             {alternates.length > 0 && ` · ${alternates.length} alternates ready to swap`}
@@ -185,12 +186,12 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
         </div>
         <div className="page-header-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={{ ...glassBtnGhost, fontSize: 13 }} onClick={() => setView(v => v === 'grid' ? 'list' : v === 'list' ? 'carousel' : 'grid')}>
-            {view === 'grid' ? '☰ List' : view === 'list' ? '🎴 Carousel' : '⊞ Grid'}
+            {view === 'grid' ? '☰ list' : view === 'list' ? '🎴 carousel' : '⊞ grid'}
           </button>
-          <button style={glassBtnGhost} onClick={() => onNavigate('recipes')}>+ Browse</button>
-          <button style={glassBtnGhost} onClick={() => setShowTemplates(true)}>📋 Templates</button>
-          <button style={{ ...glassBtnGhost, opacity: !primaries.length ? 0.5 : 1 }} onClick={() => setShowPrepGuide(true)} disabled={!primaries.length}>⚡ Prep Guide</button>
-          <button style={{ ...glassBtnPrimary, opacity: !primaries.length ? 0.5 : 1 }} onClick={generateShoppingList} disabled={!primaries.length}>🛒 Shopping List</button>
+          <button style={glassBtnGhost} onClick={() => onNavigate('recipes')}>+ browse</button>
+          <button style={glassBtnGhost} onClick={() => setShowTemplates(true)}>📋 templates</button>
+          <button style={{ ...glassBtnGhost, opacity: !primaries.length ? 0.5 : 1 }} onClick={() => setShowPrepGuide(true)} disabled={!primaries.length}>⚡ prep guide</button>
+          <button style={{ ...glassBtnPrimary, opacity: !primaries.length ? 0.5 : 1 }} onClick={generateShoppingList} disabled={!primaries.length}>generate shopping →</button>
         </div>
       </div>
 
@@ -198,14 +199,15 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
       <Glass padding={16} style={{ marginBottom: 22, display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 18 }}>✨</span>
-          <span style={{ fontWeight: 700, fontSize: 13, color: THEME.ink, letterSpacing: '0.04em' }}>Auto-curate week</span>
+          <span style={{ fontFamily: display, fontStyle: 'italic', fontSize: 16, color: THEME.ink }}>auto-curate the week</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
-            fontSize: 10, color: THEME.dim, fontWeight: 700,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 10, color: THEME.dim, fontWeight: 500,
             textTransform: 'uppercase', letterSpacing: '0.08em',
-          }}>Strategy</span>
+          }}>strategy</span>
           <div style={{
             display: 'flex',
             background: 'oklch(1 0 0 / 0.45)',
@@ -214,9 +216,9 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
             boxShadow: 'inset 0 1px 0 oklch(1 0 0 / 0.6), 0 0 0 0.5px oklch(0.4 0.02 60 / 0.16)',
           }}>
             {[
-              { key: 'overlap',   label: 'Overlap',   title: 'Maximize shared ingredients — cheapest shopping' },
-              { key: 'top-rated', label: 'Top Rated', title: 'Pick highest-rated recipes regardless of overlap' },
-              { key: 'novelty',   label: '✨ Novelty', title: 'ADHD mode — minimize shared ingredients, every day feels new' },
+              { key: 'overlap',   label: 'overlap',   title: 'maximize shared ingredients — cheapest shopping' },
+              { key: 'top-rated', label: 'top-rated', title: 'pick highest-rated recipes regardless of overlap' },
+              { key: 'novelty',   label: '✨ novelty', title: 'adhd mode — minimize shared ingredients, every day feels new' },
             ].map(s => (
               <button
                 key={s.key}
@@ -238,21 +240,22 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
-            fontSize: 10, color: THEME.dim, fontWeight: 700,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 10, color: THEME.dim, fontWeight: 500,
             textTransform: 'uppercase', letterSpacing: '0.08em',
-          }}>Days</span>
+          }}>days</span>
           <select value={planDays} onChange={e => setPlanDays(Number(e.target.value))} style={{ fontSize: 13, padding: '6px 10px', width: 64 }}>
             {[3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
 
         <button style={{ ...glassBtnPrimary, fontSize: 13 }} onClick={autoCurate} disabled={curating}>
-          {curating ? '…' : primaries.length ? 'Re-curate' : 'Auto-fill week'}
+          {curating ? '…' : primaries.length ? 're-curate' : 'auto-fill week'}
         </button>
 
         {cost && cost.total_usd > 0 && (
           <div style={{ marginLeft: 'auto', fontSize: 12, color: THEME.dim }}>
-            Est. weekly cost{' '}
+            est. weekly cost{' '}
             <span style={{ color: THEME.sage, fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: 14 }}>${cost.total_usd.toFixed(0)}</span>
             {cost.meals_with_cost_data < cost.meals && (
               <span style={{ fontSize: 11, marginLeft: 4, color: THEME.faint }}> ({cost.meals_with_cost_data}/{cost.meals} priced)</span>
@@ -636,7 +639,7 @@ export default function MealPlanBuilder({ currentPlan, setCurrentPlan, onNavigat
         <div className="modal-backdrop" onClick={() => setShowTemplates(false)}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, fontWeight: 500 }}>Plan templates</div>
+              <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, fontWeight: 500 }}>plan templates</div>
               <button className="modal-close" onClick={() => setShowTemplates(false)}>×</button>
             </div>
             <div className="modal-body">

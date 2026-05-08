@@ -142,7 +142,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
   if (!currentPlan?.id) {
     return (
       <div className="page">
-        <PageHeader eyebrow="To buy" title="Shopping list" />
+        <PageHeader eyebrow="to buy" title="shopping list" />
         <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
           <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
@@ -157,7 +157,7 @@ export default function ShoppingList({ currentPlan, showToast }) {
   if (!list) {
     return (
       <div className="page">
-        <PageHeader eyebrow="To buy" title="Shopping list" />
+        <PageHeader eyebrow="to buy" title="shopping list" />
         <Glass padding={48} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 38, marginBottom: 12 }}>🛒</div>
           <div style={{ fontFamily: display, fontSize: 22, fontStyle: 'italic', color: THEME.ink, marginBottom: 8 }}>
@@ -190,13 +190,14 @@ export default function ShoppingList({ currentPlan, showToast }) {
       <div className="page-header">
         <div>
           <div style={{
-            fontSize: 11, color: THEME.accent, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
-          }}>To buy</div>
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 11, color: THEME.dim, fontWeight: 500,
+            letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4,
+          }}>to buy</div>
           <div style={{
             fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
-            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
-          }}>Shopping list</div>
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em',
+          }}>the forage list.</div>
           <div style={{ color: THEME.dim, fontSize: 13, marginTop: 6 }}>
             <span style={{
               color: THEME.ink, fontFamily: display, fontStyle: 'italic',
@@ -206,12 +207,12 @@ export default function ShoppingList({ currentPlan, showToast }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={glassBtnGhost} onClick={copyList}>📋 Copy</button>
+          <button style={glassBtnGhost} onClick={copyList}>📋 copy</button>
           <button style={{ ...glassBtnGhost, opacity: generating ? 0.5 : 1 }} onClick={generate} disabled={generating}>
-            {generating ? 'Regenerating…' : '🔄 Regenerate'}
+            {generating ? 'regenerating…' : '🔄 regenerate'}
           </button>
-          <button style={glassBtnGhost} onClick={() => setShowStores(true)}>
-            🛒 Send to store
+          <button style={glassBtnPrimary} onClick={() => setShowStores(true)}>
+            send to store →
           </button>
         </div>
       </div>
@@ -229,10 +230,11 @@ export default function ShoppingList({ currentPlan, showToast }) {
         {Object.entries(grouped).map(([cat, items]) => (
           <Glass key={cat} padding={4}>
             <div style={{
-              fontSize: 11, fontWeight: 700, color: THEME.accent,
-              letterSpacing: '0.16em', textTransform: 'uppercase',
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 11, fontWeight: 500, color: THEME.accent,
+              letterSpacing: '0.08em', textTransform: 'lowercase',
               padding: '14px 16px 10px',
-            }}>{CATEGORY_LABELS[cat] || cat}</div>
+            }}>{(CATEGORY_LABELS[cat] || cat).toLowerCase()}</div>
             {items.map((item) => (
               <label
                 key={item.id}
@@ -337,7 +339,7 @@ function StorePickerModal({ storeStatus, sendingTo, onInstacart, onKroger, onWal
       <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ fontFamily: display, fontSize: 20, fontStyle: 'italic', fontWeight: 500, color: THEME.ink }}>
-            Send to store
+            send to store
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
@@ -387,12 +389,13 @@ function PageHeader({ eyebrow, title }) {
     <div className="page-header">
       <div>
         <div style={{
-          fontSize: 11, color: THEME.accent, fontWeight: 700,
-          letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 11, color: THEME.dim, fontWeight: 500,
+          letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4,
         }}>{eyebrow}</div>
         <div style={{
           fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
-          color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
+          color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em',
         }}>{title}</div>
       </div>
     </div>

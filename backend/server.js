@@ -9,7 +9,7 @@ const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
 const { chat, chatMessages } = require('./llm');
-const { makeRequireAuth, getFounderUserId } = require('./auth');
+const { makeRequireAuth, getFounderUserId, SCOPED_TABLES } = require('./auth');
 const passkeys = require('./passkeys');
 
 const app = express();
@@ -2921,6 +2921,81 @@ app.delete('/api/household/members/:memberId', (req, res) => {
   res.json(getHousehold(req.householdId));
 });
 
+// Self-service account deletion (Apple App Store §5.1.1(v) compliance).
+// Requires a typed confirmation phrase to guard against accidental clicks.
+//
+// Behavior depends on the caller's role in their household:
+//   - non-founder           → leaves the household; data stays for others
+//   - founder w/ co-members → next claimed member is promoted to founder
+//   - solo founder          → entire household + all scoped data is deleted
+// Personal-scope rows (passkeys, prefs, chat history, drink log) are wiped
+// in every case.
+app.post('/api/account/delete', (req, res) => {
+  const { confirm } = req.body || {};
+  if (confirm !== 'DELETE MY ACCOUNT') {
+    return res.status(400).json({ error: "type 'DELETE MY ACCOUNT' to confirm" });
+  }
+  const userId = req.userId;
+  if (!userId) return res.status(401).json({ error: 'auth required' });
+
+  const householdId = req.householdId;
+  const memberId = req.member?.id || null;
+  const isFounder = req.member?.role === 'founder';
+
+  let promoted = null;
+  let householdDeleted = false;
+
+  try {
+    db.transaction(() => {
+      // Personal cleanup — applies regardless of household membership.
+      db.prepare('DELETE FROM goblin_chat WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM user_prefs WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM user_passkeys WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM drink_log WHERE user_id = ?').run(userId);
+
+      if (!householdId || !memberId) return;
+
+      if (!isFounder) {
+        db.prepare('DELETE FROM household_members WHERE id = ?').run(memberId);
+        return;
+      }
+
+      // Founder path. Try to hand the household off to the oldest co-member
+      // who has actually signed in (user_id IS NOT NULL).
+      const heir = db.prepare(`
+        SELECT id, user_id, email FROM household_members
+        WHERE household_id = ? AND id != ? AND user_id IS NOT NULL
+        ORDER BY COALESCE(joined_at, invited_at) ASC LIMIT 1
+      `).get(householdId, memberId);
+
+      if (heir) {
+        db.prepare("UPDATE household_members SET role = 'founder' WHERE id = ?").run(heir.id);
+        db.prepare('UPDATE households SET founder_user_id = ? WHERE id = ?').run(heir.user_id, householdId);
+        db.prepare('DELETE FROM household_members WHERE id = ?').run(memberId);
+        promoted = { id: heir.id, email: heir.email };
+        return;
+      }
+
+      // Solo founder — wipe the household and every household-scoped row.
+      for (const t of SCOPED_TABLES) {
+        try { db.prepare(`DELETE FROM ${t} WHERE household_id = ?`).run(householdId); }
+        catch (err) { console.warn(`[account-delete] failed wiping ${t}:`, err.message); }
+      }
+      // household_members has ON DELETE CASCADE on households, but be explicit
+      // in case sqlite foreign-key enforcement is ever off in this build.
+      db.prepare('DELETE FROM household_members WHERE household_id = ?').run(householdId);
+      db.prepare('DELETE FROM households WHERE id = ?').run(householdId);
+      householdDeleted = true;
+    })();
+
+    console.log(`[account-delete] user ${userId} deleted; household_deleted=${householdDeleted} promoted=${promoted?.email || 'n/a'}`);
+    res.json({ ok: true, household_deleted: householdDeleted, promoted });
+  } catch (err) {
+    console.error('[account-delete] failed:', err);
+    res.status(500).json({ error: safeError(err) });
+  }
+});
+
 // Bulk-invite endpoint used by onboarding (founder adds multiple members in one shot)
 app.post('/api/household/invite-bulk', (req, res) => {
   if (!req.householdId || !req.member) return res.status(404).json({ error: 'no household yet' });
@@ -3431,11 +3506,21 @@ app.get('/api/goblin-state', (_req, res) => {
         AND NOT EXISTS (SELECT 1 FROM meal_plan_items mpi WHERE mpi.recipe_id = r.id)
     `).get()?.c || 0;
 
+    // The most recent of those — what the goblin is "eyeing".
+    const latestUnplanned = db.prepare(`
+      SELECT r.id, r.name FROM recipes r
+      WHERE r.created_at >= datetime('now', '-14 days')
+        AND r.assigned = 0
+        AND NOT EXISTS (SELECT 1 FROM meal_plan_items mpi WHERE mpi.recipe_id = r.id)
+      ORDER BY r.created_at DESC LIMIT 1
+    `).get();
+
     const dow = new Date().getDay(); // 0=Sun .. 6=Sat
     const weekHalfOver = dow >= 3;   // Wed onward
 
     let state = 'idle';
     let recipe = null;
+    let recipeId = null;
     if (fixated && fixated.c >= 3) {
       state = 'fixated';
       recipe = fixated.name;
@@ -3445,6 +3530,10 @@ app.get('/api/goblin-state', (_req, res) => {
       state = 'hungry';
     } else if (unplannedRecent >= 1) {
       state = 'curious';
+      if (latestUnplanned) {
+        recipe = latestUnplanned.name;
+        recipeId = latestUnplanned.id;
+      }
     } else if (plannedThisWeek === 0 && recentCooks === 0) {
       state = 'sleeping';
     } else {
@@ -3454,6 +3543,7 @@ app.get('/api/goblin-state', (_req, res) => {
     res.json({
       state,
       recipe,
+      recipe_id: recipeId,
       signals: {
         cooks_this_week: cooksThisWeek,
         planned_this_week: plannedThisWeek,

@@ -102,21 +102,21 @@ function EditView({ recipe, onSave, onCancel, saving }) {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {inputLabel('Description')}
+        {inputLabel('description')}
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
           style={{ width: '100%', resize: 'vertical' }} />
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {inputLabel('Ingredients')}
+        {inputLabel('ingredients')}
         {ingredients.map((ing, i) => (
           <IngredientRow key={i} ing={ing} onChange={v => updateIngredient(i, v)} onRemove={() => removeIngredient(i)} />
         ))}
-        <button style={{ ...glassBtnGhost, fontSize: 13, marginTop: 4 }} onClick={addIngredient}>+ Add ingredient</button>
+        <button style={{ ...glassBtnGhost, fontSize: 13, marginTop: 4 }} onClick={addIngredient}>+ add ingredient</button>
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {inputLabel('Instructions')}
+        {inputLabel('instructions')}
         {instructions.map((step, i) => (
           <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
             <div style={{
@@ -134,34 +134,34 @@ function EditView({ recipe, onSave, onCancel, saving }) {
             }}>×</button>
           </div>
         ))}
-        <button style={{ ...glassBtnGhost, fontSize: 13, marginTop: 4 }} onClick={addStep}>+ Add step</button>
+        <button style={{ ...glassBtnGhost, fontSize: 13, marginTop: 4 }} onClick={addStep}>+ add step</button>
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {inputLabel('Toddler notes')}
+        {inputLabel('toddler notes')}
         <textarea value={toddlerNotes} onChange={e => setToddlerNotes(e.target.value)} rows={2}
           style={{ width: '100%', resize: 'vertical' }} />
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {inputLabel('Batch prep tip')}
+        {inputLabel('batch prep tip')}
         <textarea value={batchNotes} onChange={e => setBatchNotes(e.target.value)} rows={2}
           style={{ width: '100%', resize: 'vertical' }} />
       </div>
 
       <div style={{ marginBottom: 24 }}>
-        {inputLabel('Tags (comma-separated)')}
+        {inputLabel('tags (comma-separated)')}
         <input value={tags} onChange={e => setTags(e.target.value)} placeholder="e.g. high-protein, one-pan, kid-approved" style={{ width: '100%' }} />
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button style={{ ...glassBtnGhost, flex: 1 }} onClick={onCancel}>Cancel</button>
+        <button style={{ ...glassBtnGhost, flex: 1 }} onClick={onCancel}>cancel</button>
         <button
           style={{ ...glassBtnPrimary, flex: 2, opacity: (saving || !name.trim()) ? 0.5 : 1 }}
           onClick={submit}
           disabled={saving || !name.trim()}
         >
-          {saving ? 'Saving…' : 'Save Changes'}
+          {saving ? 'saving…' : 'save changes'}
         </button>
       </div>
     </>
@@ -272,8 +272,8 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
             {mode === 'view' && (
               <>
-                <button style={{ ...glassBtnGhost, fontSize: 13, padding: '7px 14px' }} onClick={() => setMode('edit')}>Edit</button>
-                <button style={{ ...glassBtnPrimary, fontSize: 13, padding: '7px 16px' }} onClick={() => setCooking(true)}>🍳 Cook</button>
+                <button style={{ ...glassBtnGhost, fontSize: 13, padding: '7px 14px' }} onClick={() => setMode('edit')}>edit</button>
+                <button style={{ ...glassBtnPrimary, fontSize: 13, padding: '7px 16px' }} onClick={() => setCooking(true)}>🍳 cook</button>
               </>
             )}
             {mode === 'view' && <button className="modal-close" onClick={onClose}>×</button>}
@@ -305,7 +305,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
                       fontFamily: 'inherit',
                     }}
                   >
-                    {showCollectionPicker ? 'Done' : '+ Collection'}
+                    {showCollectionPicker ? 'done' : '+ collection'}
                   </button>
                   {showCollectionPicker && (
                     <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
@@ -336,7 +336,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               )}
 
               <div style={{ marginBottom: 22 }}>
-                <SectionTitle>Ingredients · serves {recipe.servings_adult} adults</SectionTitle>
+                <SectionTitle>ingredients · serves {recipe.servings_adult} adults</SectionTitle>
                 <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'disc', color: THEME.text }}>
                   {(recipe.ingredients || []).map((ing, i) => (
                     <li key={i} style={{ fontSize: 14, lineHeight: 1.45 }}>
@@ -350,7 +350,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               </div>
 
               <div style={{ marginBottom: 22 }}>
-                <SectionTitle>Instructions</SectionTitle>
+                <SectionTitle>instructions</SectionTitle>
                 <ol style={{ paddingLeft: 0, display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', counterReset: 'step' }}>
                   {(recipe.instructions || []).map((step, i) => (
                     <li key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -398,7 +398,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               {recipe.toddler_notes && (
                 <Glass tint="oklch(0.55 0.10 50 / 0.18)" padding={16} style={{ marginBottom: 16 }}>
                   <div style={{ fontWeight: 700, marginBottom: 6, color: THEME.ink, fontSize: 13, letterSpacing: '0.04em' }}>
-                    👶 Toddler notes
+                    👶 toddler notes
                   </div>
                   <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.55 }}>{recipe.toddler_notes}</div>
                   {(recipe.choking_hazards || []).length > 0 && (
@@ -424,7 +424,7 @@ export default function RecipeModal({ recipe: initialRecipe, onClose, onRate, on
               )}
 
               <div>
-                <SectionTitle>Nutrition · per adult serving</SectionTitle>
+                <SectionTitle>nutrition · per adult serving</SectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                   {[['Calories', n.calories, 'kcal'], ['Protein', n.protein_g, 'g'], ['Fat', n.fat_g, 'g'], ['Carbs', n.carbs_g, 'g'],
                     ['Iron', n.iron_mg, 'mg'], ['Calcium', n.calcium_mg, 'mg'], ['DHA', n.dha_mg, 'mg'], ['Vit D', n.vitamin_d_iu, 'IU']

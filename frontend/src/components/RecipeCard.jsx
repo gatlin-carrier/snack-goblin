@@ -1,6 +1,6 @@
-import { Glass, Badge, PhotoBg, THEME, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
+import { Glass, Badge, PhotoBg, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
-const MEAL_TYPE_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+const MEAL_TYPE_LABEL = { breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack' };
 const MEAL_TYPE_TONE  = { breakfast: 'yellow',     lunch: 'sage',  dinner: 'accent', snack: 'rust' };
 
 function StarRating({ rating, count, onRate, size = 'sm' }) {
@@ -19,7 +19,7 @@ function StarRating({ rating, count, onRate, size = 'sm' }) {
             lineHeight: 1,
             userSelect: 'none',
           }}
-          title={onRate ? `Rate ${s} star${s > 1 ? 's' : ''}` : `${rating?.toFixed(1)} (${count} ratings)`}
+          title={onRate ? `rate ${s} star${s > 1 ? 's' : ''}` : `${rating?.toFixed(1)} (${count} ratings)`}
         >★</span>
       ))}
       {count > 0 && (
@@ -69,8 +69,8 @@ export default function RecipeCard({ recipe, selected, onClick, onAdd, onDiscard
 
         <div style={{ padding: 16 }}>
           <div style={{
-            fontFamily: 'inherit', fontSize: 16, fontWeight: 600, lineHeight: 1.25,
-            color: THEME.ink, marginBottom: 6,
+            fontFamily: display, fontStyle: 'italic', fontSize: 18, fontWeight: 500, lineHeight: 1.2,
+            color: THEME.ink, marginBottom: 6, letterSpacing: '-0.01em',
           }}>{recipe.name}</div>
 
           <div style={{
@@ -83,13 +83,13 @@ export default function RecipeCard({ recipe, selected, onClick, onAdd, onDiscard
             {recipe.cost_per_serving != null && (
               <>
                 <span style={{ color: THEME.faint }}>·</span>
-                <span style={{ color: THEME.sage, fontWeight: 600 }} title="Estimated cost per serving">
+                <span style={{ color: THEME.sage, fontWeight: 600 }} title="estimated cost per serving">
                   ${recipe.cost_per_serving.toFixed(0)}/serving
                 </span>
               </>
             )}
-            {n.iron_mg > 3 && <span style={{ color: THEME.sage }}>· Iron</span>}
-            {n.dha_mg > 50 && <span style={{ color: THEME.accent }}>· DHA</span>}
+            {n.iron_mg > 3 && <span style={{ color: THEME.sage }}>· iron</span>}
+            {n.dha_mg > 50 && <span style={{ color: THEME.accent }}>· dha</span>}
           </div>
 
           <div style={{
@@ -105,11 +105,11 @@ export default function RecipeCard({ recipe, selected, onClick, onAdd, onDiscard
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {recipe.toddler_safe ? (
-              <Badge tone="sage">👶 Toddler OK</Badge>
+              <Badge tone="sage">👶 toddler ok</Badge>
             ) : (
-              <Badge tone="rust">⚠ Modify</Badge>
+              <Badge tone="rust">⚠ modify</Badge>
             )}
-            {hasHazards && <Badge tone="yellow">✂ Prep needed</Badge>}
+            {hasHazards && <Badge tone="yellow">✂ prep needed</Badge>}
             {(recipe.tags || []).slice(0, 2).map(t => (
               <Badge key={t} tone="neutral">{t}</Badge>
             ))}
@@ -123,14 +123,14 @@ export default function RecipeCard({ recipe, selected, onClick, onAdd, onDiscard
                   onClick={onAdd}
                   disabled={planItemCount >= 35}
                 >
-                  + Add to Week
+                  + add to week
                 </button>
               )}
               {onDiscard && (
                 <button
                   style={{ ...glassBtnGhost, color: THEME.red, padding: '9px 14px' }}
                   onClick={onDiscard}
-                  title="Delete recipe"
+                  title="delete recipe"
                 >✕</button>
               )}
             </div>

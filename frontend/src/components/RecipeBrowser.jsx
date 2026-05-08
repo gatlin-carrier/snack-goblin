@@ -7,18 +7,18 @@ import ImportURLPanel from './ImportURLPanel.jsx';
 import { Glass, THEME, display, glassBtnPrimary, glassBtnGhost } from '../lib/glass.jsx';
 
 const MEAL_TYPES = [
-  { key: '',          label: 'All' },
-  { key: 'breakfast', label: 'Breakfast' },
-  { key: 'lunch',     label: 'Lunch' },
-  { key: 'dinner',    label: 'Dinner' },
-  { key: 'snack',     label: 'Snacks' },
+  { key: '',          label: 'all' },
+  { key: 'breakfast', label: 'breakfast' },
+  { key: 'lunch',     label: 'lunch' },
+  { key: 'dinner',    label: 'dinner' },
+  { key: 'snack',     label: 'snacks' },
 ];
 
 const SORT_OPTIONS = [
-  { key: 'created_at',  label: 'Newest' },
-  { key: 'recommended', label: '⭐ Recommended' },
-  { key: 'rating',      label: 'Top Rated' },
-  { key: 'cost',        label: '💰 Cheapest' },
+  { key: 'created_at',  label: 'newest' },
+  { key: 'recommended', label: '⭐ recommended' },
+  { key: 'rating',      label: 'top rated' },
+  { key: 'cost',        label: '💰 cheapest' },
 ];
 
 export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
@@ -102,18 +102,19 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
       <div className="page-header">
         <div>
           <div style={{
-            fontSize: 11, color: THEME.accent, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 6,
-          }}>Library</div>
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 11, color: THEME.dim, fontWeight: 500,
+            letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4,
+          }}>library</div>
           <div style={{
             fontFamily: display, fontSize: 36, fontWeight: 400, fontStyle: 'italic',
-            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.01em',
-          }}>Recipes</div>
+            color: THEME.ink, lineHeight: 1.05, letterSpacing: '-0.02em',
+          }}>the cookbook.</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={glassBtnGhost} onClick={() => setShowPrefs(true)}>⚙ Preferences</button>
-          <button style={glassBtnGhost} onClick={() => setShowImport(true)}>🔗 Import URL</button>
-          <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ Generate</button>
+          <button style={glassBtnGhost} onClick={() => setShowPrefs(true)}>⚙ preferences</button>
+          <button style={glassBtnGhost} onClick={() => setShowImport(true)}>🔗 import url</button>
+          <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ generate</button>
         </div>
       </div>
 
@@ -151,9 +152,9 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
               {SORT_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
             <select value={filter.in_rotation} onChange={e => setFilter(f => ({ ...f, in_rotation: e.target.value }))} style={{ fontSize: 13 }}>
-              <option value="">All recipes</option>
-              <option value="1">In rotation</option>
-              <option value="0">Paused</option>
+              <option value="">all recipes</option>
+              <option value="1">in rotation</option>
+              <option value="0">paused</option>
             </select>
           </>
         )}
@@ -164,7 +165,7 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
             setActiveCollection(col || null);
             setActiveTag('');
           }} style={{ fontSize: 13 }}>
-            <option value="">All collections</option>
+            <option value="">all collections</option>
             {collections.map(c => <option key={c.id} value={c.id}>🗂 {c.name}</option>)}
           </select>
         )}
@@ -216,7 +217,7 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
           <div style={{ color: THEME.dim, marginBottom: 22, fontSize: 14, lineHeight: 1.5 }}>
             {activeCollection ? "open any recipe and use \"+ Collection\" to add it here." : "let's fill it. i'll generate a few options based on your preferences."}
           </div>
-          {!activeCollection && <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ generate recipes</button>}
+          {!activeCollection && <button style={glassBtnPrimary} onClick={() => setShowGenerate(true)}>✨ generate recipes →</button>}
         </Glass>
       ) : (
         <div className="grid-auto">

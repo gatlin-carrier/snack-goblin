@@ -27,26 +27,26 @@ import Goblin from './components/Goblin.jsx';
 import { isPasskeySupported, getCachedCredentialId } from './lib/passkeys.js';
 
 const TOP_NAV = [
-  { id: 'dashboard', label: 'This Week' },
-  { id: 'recipes',   label: 'Recipes' },
-  { id: 'plan',      label: 'Plan' },
-  { id: 'shopping',  label: 'Shopping' },
-  { id: 'pantry',    label: 'Pantry' },
+  { id: 'dashboard', label: 'today' },
+  { id: 'plan',      label: 'this week' },
+  { id: 'recipes',   label: 'recipes' },
+  { id: 'shopping',  label: 'shopping' },
+  { id: 'pantry',    label: 'pantry' },
 ];
 
 const MORE_VIEWS = [
-  { id: 'allergens',   label: 'Allergens' },
-  { id: 'history',     label: 'History' },
-  { id: 'firstfoods',  label: 'First foods' },
-  { id: 'collections', label: 'Collections' },
+  { id: 'allergens',   label: 'allergens' },
+  { id: 'history',     label: 'history' },
+  { id: 'firstfoods',  label: 'first foods' },
+  { id: 'collections', label: 'collections' },
 ];
 
 const TAB_BAR = [
-  { id: 'dashboard', label: 'Today',   icon: '◇' },
-  { id: 'recipes',   label: 'Recipes', icon: '◎' },
-  { id: 'plan',      label: 'Plan',    icon: '☰' },
-  { id: 'shopping',  label: 'Shop',    icon: '⌗' },
-  { id: 'menu',      label: 'More',    icon: '···' },
+  { id: 'dashboard', label: 'today',  icon: '◇' },
+  { id: 'plan',      label: 'plan',   icon: '☰' },
+  { id: 'recipes',   label: 'recipes', icon: '◎' },
+  { id: 'shopping',  label: 'shop',   icon: '⌗' },
+  { id: 'menu',      label: 'more',   icon: '···' },
 ];
 
 function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settingsHandlers, onSignOut }) {
@@ -71,17 +71,17 @@ function GlassTopNav({ view, setView, onMore, showMoreMenu, onMoreToggle, settin
         </nav>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingRight: 4, position: 'relative' }}>
-        <GlassPill onClick={() => settingsHandlers.openIntegrations()} title="Integrations">🔌</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openLLM()} title="AI model">🤖</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openNtfy()} title="Notifications">🔔</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="Adult goals">💪</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="Child profile">🧒</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openDrinks()} title="Drinks">🥛</GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openGoblin()} title="The goblin" style={{ display: 'flex', alignItems: 'center' }}>
+        <GlassPill onClick={() => settingsHandlers.openIntegrations()} title="integrations">🔌</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openLLM()} title="ai model">🤖</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openNtfy()} title="notifications">🔔</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openAdultGoals()} title="adult goals">💪</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openChildProfile()} title="child profile">🧒</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openDrinks()} title="drinks">🥛</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openGoblin()} title="the goblin" style={{ display: 'flex', alignItems: 'center' }}>
           <Goblin state="idle" size={18} />
         </GlassPill>
-        <GlassPill onClick={() => settingsHandlers.openHousehold()} title="Household">🏠</GlassPill>
-        <GlassPill onClick={onSignOut} title="Sign out">↪</GlassPill>
+        <GlassPill onClick={() => settingsHandlers.openHousehold()} title="household">🏠</GlassPill>
+        <GlassPill onClick={onSignOut} title="sign out">↪</GlassPill>
         {showMoreMenu && (
           <div style={{
             position: 'absolute', top: '100%', right: 0, marginTop: 10, zIndex: 60,
@@ -276,7 +276,7 @@ export default function App() {
           <div className="modal-backdrop" onClick={() => setShowMobileMore(false)}>
             <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, fontStyle: 'italic', color: 'var(--color-ink)' }}>More</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, fontStyle: 'italic', color: 'var(--color-ink)' }}>more</div>
                 <button className="modal-close" onClick={() => setShowMobileMore(false)}>×</button>
               </div>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -287,16 +287,16 @@ export default function App() {
                   </button>
                 ))}
                 <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowAdultGoals(true); setShowMobileMore(false); }}>💪 Adult goals</button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowChildProfile(true); setShowMobileMore(false); }}>🧒 Child profile</button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowDrinks(true); setShowMobileMore(false); }}>🥛 Drinks</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowAdultGoals(true); setShowMobileMore(false); }}>💪 adult goals</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowChildProfile(true); setShowMobileMore(false); }}>🧒 child profile</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowDrinks(true); setShowMobileMore(false); }}>🥛 drinks</button>
                 <button className="btn-ghost" style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowGoblin(true); setShowMobileMore(false); }}>
-                  <Goblin state="idle" size={16} /> The goblin
+                  <Goblin state="idle" size={16} /> the goblin
                 </button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowHousehold(true); setShowMobileMore(false); }}>🏠 Household</button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 Notifications</button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 Integrations</button>
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 AI model</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowHousehold(true); setShowMobileMore(false); }}>🏠 household</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowNtfySettings(true); setShowMobileMore(false); }}>🔔 notifications</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowIntegrations(true); setShowMobileMore(false); }}>🔌 integrations</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { setShowLLMSettings(true); setShowMobileMore(false); }}>🤖 ai model</button>
                 <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
                 <button
                   className="btn-ghost"
@@ -310,7 +310,7 @@ export default function App() {
                   {prefs.low_capacity_mode ? '🌿 low-capacity day · on' : '🌿 low-capacity day · off'}
                 </button>
                 <div style={{ height: 1, background: 'var(--color-hairline)', margin: '8px 0' }} />
-                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { signOut(); setShowMobileMore(false); }}>↪ Sign out</button>
+                <button className="btn-ghost" style={{ textAlign: 'left' }} onClick={() => { signOut(); setShowMobileMore(false); }}>↪ sign out</button>
               </div>
             </div>
           </div>

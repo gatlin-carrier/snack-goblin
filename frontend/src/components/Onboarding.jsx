@@ -97,14 +97,30 @@ export default function Onboarding({ onDone }) {
       <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
         <div className="modal-body" style={{ padding: '32px 28px' }}>
 
+          {/* Top progress segments — design has 6, we map to STEPS */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
+            {STEPS.map((_, i) => (
+              <div key={i} style={{
+                flex: 1, height: 3, borderRadius: 999,
+                background: i <= step ? THEME.accent : 'oklch(0.4 0.02 60 / 0.18)',
+                transition: 'background 200ms ease',
+              }} />
+            ))}
+          </div>
+
           <div className="text-center mb-6">
-            <div className="flex justify-center mb-2.5">
-              <Goblin state="idle" size={52} />
+            <div className="flex justify-center mb-3">
+              <Goblin state={stepKey === 'hated' ? 'fixated' : stepKey === 'comfort' ? 'well-fed' : stepKey === 'done' ? 'well-fed' : 'curious'} size={86} />
             </div>
-            <div style={{ fontFamily: display, fontSize: 24, fontStyle: 'italic', lineHeight: 1.2 }} className="text-ink mb-1.5">
+            <div style={{
+              fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+              fontSize: 10, color: THEME.dim, fontWeight: 500,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+            }}>step {step + 1} of {STEPS.length}</div>
+            <div style={{ fontFamily: display, fontSize: 28, fontStyle: 'italic', lineHeight: 1.15, letterSpacing: '-0.01em', marginTop: 6 }} className="text-ink">
               {headlines[stepKey][0]}
             </div>
-            <div className="text-dim text-[13px]" style={{ lineHeight: 1.55 }}>
+            <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.55, marginTop: 10, fontStyle: 'italic', fontFamily: display }}>
               {headlines[stepKey][1]}
             </div>
           </div>
@@ -259,15 +275,6 @@ export default function Onboarding({ onDone }) {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 18 }}>
-            {STEPS.map((_, i) => (
-              <div key={i} style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: i === step ? THEME.accent : i < step ? THEME.sagePastel : 'oklch(0.4 0.02 60 / 0.18)',
-                transition: 'background 200ms ease',
-              }} />
-            ))}
-          </div>
         </div>
       </div>
     </div>

@@ -119,4 +119,4 @@ function getFounderUserId() {
   return null;
 }
 
-module.exports = { requireAuth, makeRequireAuth, getFounderUserId };
+module.exports = { requireAuth, makeRequireAuth, getFounderUserId, SCOPED_TABLES };
