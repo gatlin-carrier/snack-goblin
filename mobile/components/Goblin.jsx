@@ -40,33 +40,38 @@ function GoblinSvg({ state = 'idle', size = 48, lookProgress = 0, smileProgress 
 
   const showHat = state !== 'sleeping';
 
-  // Anime highlights — drift downward as goblin looks at the text field
-  const eyeCY = cy - s * 0.04;
-  const hlY = eyeCY - s*0.016 + s*0.028 * lookProgress;
-  const activeEyes = lookProgress > 0 ? (
-    <G>
-      <Ellipse cx={cx - s*0.10} cy={eyeCY} rx={s*0.035} ry={s*0.042} fill={PALETTE.ink}/>
-      <Ellipse cx={cx + s*0.10} cy={eyeCY} rx={s*0.035} ry={s*0.042} fill={PALETTE.ink}/>
-      <Circle cx={cx - s*0.111} cy={hlY} r={s*0.011} fill="white"/>
-      <Circle cx={cx + s*0.089} cy={hlY} r={s*0.011} fill="white"/>
-      <Circle cx={cx - s*0.097} cy={hlY + s*0.013} r={s*0.006} fill="rgba(255,255,255,0.6)"/>
-      <Circle cx={cx + s*0.103} cy={hlY + s*0.013} r={s*0.006} fill="rgba(255,255,255,0.6)"/>
-    </G>
-  ) : null;
+  // Growing smirk — right corner stays high, left corner drops as it widens.
+  // Triggered from first keypress so there's no sudden shape switch mid-typing.
+  const smirkLx = cx - s * (0.07 + 0.05 * smileProgress);
+  const smirkLy = cy + s * (0.08 + 0.01 * smileProgress);
+  const smirkRx = cx + s * (0.09 + 0.05 * smileProgress);
+  const smirkRy = cy + s * (0.05 - 0.02 * smileProgress);
+  const smirkQx = cx + s * (0.01 + 0.02 * smileProgress);
+  const smirkQy = cy + s * (0.12 + 0.02 * smileProgress);
 
-  // Smile: activated from the FIRST keypress (lookProgress > 0) so there's never a flat
-  // line transition. Baseline ctrl depth is s*0.10 so even at smileProgress=0 it's a
-  // visible gentle smile, growing to a big grin at smileProgress=1.
-  const smileW    = s * (0.07 + 0.07 * smileProgress);
-  const smileCtrlY = cy + s * (0.10 + 0.08 * smileProgress);
-  const smileFill  = smileProgress > 0.3
-    ? `rgba(212,112,58,${((smileProgress - 0.3) * 0.6).toFixed(2)})`
-    : 'none';
+  // Fang attachment point: evaluate the smirk bezier at t≈0.75 (smileProgress=0)
+  // through t≈0.62 (smileProgress=1) — both land near x=cx+0.05s.
+  // Tangent slope at that t: dy/dx ≈ -0.53→-0.39 (up-right), so the fang top
+  // must tilt — left corner lower, right corner higher — to sit flush on the curve.
+  const fangCx  = cx + s * 0.05;
+  const fangTop = cy + s * (0.078 + 0.013 * smileProgress);
+  const fangTip = fangTop + s * (0.052 + 0.018 * smileProgress);
+  const fangW   = s * 0.022;
+  const fangTilt = s * (0.012 - 0.003 * smileProgress); // vertical offset per half-width
+  const fangLx = fangCx - fangW;  const fangLy = fangTop + fangTilt; // left: lower
+  const fangRx = fangCx + fangW;  const fangRy = fangTop - fangTilt; // right: higher
+
   const activeMouth = lookProgress > 0 ? (
-    <Path
-      d={`M ${cx - smileW} ${cy + s*0.06} Q ${cx} ${smileCtrlY} ${cx + smileW} ${cy + s*0.06}`}
-      stroke={PALETTE.ink} strokeWidth={s * 0.022} fill={smileFill} strokeLinecap="round"
-    />
+    <G>
+      <Path
+        d={`M ${smirkLx} ${smirkLy} Q ${smirkQx} ${smirkQy} ${smirkRx} ${smirkRy}`}
+        stroke={PALETTE.ink} strokeWidth={s * 0.022} fill="none" strokeLinecap="round"
+      />
+      <Path
+        d={`M ${fangLx} ${fangLy} L ${fangRx} ${fangRy} L ${fangCx} ${fangTip} Z`}
+        fill="white" strokeLinejoin="round"
+      />
+    </G>
   ) : null;
 
   // Dome — toque blanche silhouette, sides bulge wider than the brim then round to a peak
@@ -135,7 +140,7 @@ function GoblinSvg({ state = 'idle', size = 48, lookProgress = 0, smileProgress 
       </>}
 
       {/* Eyes */}
-      {activeEyes || eyes[state] || eyes.idle}
+      {eyes[state] || eyes.idle}
       {/* Mouth */}
       {activeMouth || mouths[state] || mouths.idle}
     </Svg>
