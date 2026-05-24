@@ -11,6 +11,7 @@ const http = require('http');
 const { chat, chatMessages } = require('./llm');
 const { makeRequireAuth, getFounderUserId, SCOPED_TABLES } = require('./auth');
 const passkeys = require('./passkeys');
+const external = require('./external');
 
 const app = express();
 const PORT = process.env.PORT || 3710;
@@ -396,6 +397,11 @@ db.exec(`
 // Public passkey routes — must be mounted BEFORE the /api auth middleware
 // so unauthenticated users can use Face ID to sign back in.
 passkeys.attachPublic(app, db);
+
+// External integrations API (Goblin Calendar) — shared-bearer-token read API.
+// Mounted BEFORE the Supabase auth middleware so server-to-server callers on
+// the trusted homelab network skip the household JWT pipeline. See external.js.
+external.attach(app, db);
 
 // Install Supabase auth middleware now that db is ready (founder-claim needs db).
 app.use('/api', makeRequireAuth({ db }));

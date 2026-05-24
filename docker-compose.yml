@@ -20,6 +20,8 @@ services:
       - ALLOWED_EMAILS=${ALLOWED_EMAILS:-}
       - PASSKEY_RP_ID=${PASSKEY_RP_ID:-meal-planner.lumi-server.dev}
       - PASSKEY_ORIGIN=${PASSKEY_ORIGIN:-https://meal-planner.lumi-server.dev}
+      # Shared bearer token for the Goblin Calendar read API (/api/external/v1/*)
+      - INTEGRATION_TOKEN=${INTEGRATION_TOKEN:-}
     dns:
       - 8.8.8.8
       - 1.1.1.1
