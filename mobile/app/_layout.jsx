@@ -5,20 +5,39 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { PrefsProvider } from '../lib/prefs';
+import { PrefsProvider, usePrefs } from '../lib/prefs';
 import { useRouter, useSegments } from 'expo-router';
 
 function AuthGate() {
   const { session, loading } = useAuth();
+  const { prefs, loaded } = usePrefs();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
     if (loading) return;
-    const inAuth = segments[0] === 'login' || segments[0] === 'onboarding';
-    if (!session && !inAuth) router.replace('/login');
-    if (session && segments[0] === 'login') router.replace('/(tabs)');
-  }, [session, loading, segments]);
+
+    // Not signed in → login (unless already on login/onboarding).
+    if (!session) {
+      if (segments[0] !== 'login') router.replace('/login');
+      return;
+    }
+
+    // Signed in but prefs haven't loaded yet — wait so we don't bounce to
+    // onboarding on a stale default before the real value arrives.
+    if (!loaded) return;
+
+    // Signed in + onboarding not done → onboarding (unless already there).
+    if (!prefs.onboarding_complete) {
+      if (segments[0] !== 'onboarding') router.replace('/onboarding');
+      return;
+    }
+
+    // Fully onboarded but stuck on login/onboarding → home.
+    if (segments[0] === 'login' || segments[0] === 'onboarding') {
+      router.replace('/(tabs)');
+    }
+  }, [session, loading, loaded, prefs.onboarding_complete, segments]);
 
   return null;
 }

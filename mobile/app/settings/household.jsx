@@ -17,10 +17,11 @@ export default function HouseholdScreen() {
   const [showDeleteZone, setShowDeleteZone] = useState(false);
 
   useEffect(() => {
+    // GET /api/household returns the household object itself: { id, name, members }.
     get('/api/household').then(d => {
-      setHousehold(d.household);
-      setMembers(d.members || []);
-      setHouseholdName(d.household?.name || '');
+      setHousehold(d);
+      setMembers(d?.members || []);
+      setHouseholdName(d?.name || '');
     }).catch(() => {});
   }, []);
 
@@ -30,8 +31,9 @@ export default function HouseholdScreen() {
 
   async function invite() {
     if (!inviteEmail.trim()) return;
-    const m = await post('/api/household/invite', { email: inviteEmail.trim(), display_name: inviteName.trim() }).catch(() => null);
-    if (m) { setMembers(prev => [...prev, m]); setInviteEmail(''); setInviteName(''); }
+    // Returns the full household object — sync members from it.
+    const d = await post('/api/household/invite', { email: inviteEmail.trim(), display_name: inviteName.trim() }).catch(() => null);
+    if (d) { setMembers(d.members || []); setInviteEmail(''); setInviteName(''); }
   }
 
   async function removeMember(id) {
@@ -46,7 +48,8 @@ export default function HouseholdScreen() {
 
   async function deleteAccount() {
     if (deletePhrase !== 'delete my account') return;
-    await post('/api/account/delete', {}).catch(() => {});
+    // Backend requires the exact confirmation phrase 'DELETE MY ACCOUNT'.
+    await post('/api/account/delete', { confirm: 'DELETE MY ACCOUNT' }).catch(() => {});
     await signOut();
   }
 

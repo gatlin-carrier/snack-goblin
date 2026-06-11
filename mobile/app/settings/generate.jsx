@@ -38,27 +38,60 @@ export default function GenerateScreen() {
     const BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3710';
     const { currentToken } = await import('../../lib/auth');
 
-    for (const mealType of MEAL_TYPES) {
-      const count = counts[mealType];
-      if (!count) continue;
+    // The backend expects per-meal-type counts in one request and streams
+    // progress back as Server-Sent Events (text/event-stream). React Native's
+    // fetch has no reliable streaming reader, so we await the full body and
+    // parse the buffered `data:` lines once the stream closes. This means
+    // progress arrives all at once rather than live — acceptable here since
+    // generation is quick and the per-type result is still shown. The pre-flight
+    // sets every requested type to 'generating' so the UI isn't blank meanwhile.
+    const requested = MEAL_TYPES.filter(t => counts[t] > 0);
+    setStatus(Object.fromEntries(requested.map(t => [t, 'generating'])));
 
-      setStatus(s => ({ ...s, [mealType]: 'generating' }));
-      try {
-        const res = await fetch(`${BASE}/api/recipes/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${currentToken}`,
-          },
-          body: JSON.stringify({ meal_type: mealType, count, mode }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setStatus(s => ({ ...s, [mealType]: 'done' }));
-        setResults(r => ({ ...r, [mealType]: data.length || count }));
-      } catch {
-        setStatus(s => ({ ...s, [mealType]: 'error' }));
+    try {
+      const res = await fetch(`${BASE}/api/recipes/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify({
+          breakfast: counts.breakfast || 0,
+          lunch: counts.lunch || 0,
+          dinner: counts.dinner || 0,
+          snack: counts.snack || 0,
+          mode,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Do NOT call res.json() — the body is an SSE stream. Read it as text and
+      // parse each `data: {…}` event line.
+      const raw = await res.text();
+      const nextStatus = {};
+      const nextResults = {};
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        let evt;
+        try { evt = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
+        if (evt.type === 'done') {
+          nextStatus[evt.mealType] = 'done';
+          nextResults[evt.mealType] = evt.generated;
+        } else if (evt.type === 'error') {
+          nextStatus[evt.mealType] = 'error';
+        }
       }
+      // Any requested type we never saw a terminal event for is treated as done
+      // if the overall stream completed without error.
+      setStatus(s => {
+        const merged = { ...s, ...nextStatus };
+        for (const t of requested) if (!merged[t] || merged[t] === 'generating') merged[t] = 'done';
+        return merged;
+      });
+      setResults(r => ({ ...r, ...nextResults }));
+    } catch {
+      setStatus(Object.fromEntries(requested.map(t => [t, 'error'])));
     }
 
     setGenerating(false);

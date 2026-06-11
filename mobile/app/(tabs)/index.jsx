@@ -22,7 +22,7 @@ function greeting() {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session, loading } = useAuth();
   const { prefs } = usePrefs();
   const [plan, setPlan] = useState(null);
   const [goblinState, setGoblinState] = useState('idle');
@@ -46,7 +46,12 @@ export default function DashboardScreen() {
     } catch {}
   }
 
-  useEffect(() => { load(); }, []);
+  // Wait for the auth session to resolve before firing API calls — otherwise the
+  // dashboard requests race ahead of the bearer token on a cold start and 401.
+  useEffect(() => {
+    if (loading || !session) return;
+    load();
+  }, [loading, session]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -173,16 +178,26 @@ export default function DashboardScreen() {
         {leftovers.length > 0 && (
           <View className="mx-5 mt-5">
             <Text className="text-goblin-dim text-xs font-semibold tracking-wider mb-3">USE UP SOON</Text>
-            {leftovers.slice(0, 3).map(l => (
-              <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: 12, marginBottom: 8 }}>
-                <Text style={{ flex: 1, color: '#3B2212', fontSize: 14 }}>{l.label}</Text>
-                <View style={{ backgroundColor: l.days_left <= 1 ? 'rgba(188,56,56,0.15)' : 'rgba(192,158,56,0.15)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, color: l.days_left <= 1 ? '#BC3838' : '#7A6000', fontWeight: '600' }}>
-                    {l.days_left <= 0 ? 'today' : `${l.days_left}d left`}
-                  </Text>
+            {leftovers.slice(0, 3).map(l => {
+              // Parse use_by_date as local noon to avoid a TZ off-by-one day.
+              const useBy = l.use_by_date ? new Date(l.use_by_date + 'T12:00:00') : null;
+              const daysLeft = useBy
+                ? Math.round((useBy - new Date()) / 86400000)
+                : null;
+              const soon = daysLeft !== null && daysLeft <= 1;
+              return (
+                <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: 12, marginBottom: 8 }}>
+                  <Text style={{ flex: 1, color: '#3B2212', fontSize: 14 }}>{l.recipe_name}</Text>
+                  {daysLeft !== null && (
+                    <View style={{ backgroundColor: soon ? 'rgba(188,56,56,0.15)' : 'rgba(192,158,56,0.15)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 11, color: soon ? '#BC3838' : '#7A6000', fontWeight: '600' }}>
+                        {daysLeft <= 0 ? 'today' : `${daysLeft}d left`}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 

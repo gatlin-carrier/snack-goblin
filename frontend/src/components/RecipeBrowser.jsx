@@ -54,7 +54,9 @@ export default function RecipeBrowser({ currentPlan, onNavigate, showToast }) {
       url = '/api/recipes?' + params;
     }
     const res = await fetch(url);
-    setRecipes(await res.json());
+    if (!res.ok) { setRecipes([]); return; }
+    const data = await res.json();
+    setRecipes(Array.isArray(data) ? data : []);
   }
 
   async function addToPlan(recipe) {

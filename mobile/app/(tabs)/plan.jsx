@@ -49,8 +49,15 @@ export default function PlanScreen() {
 
   async function removeItem(itemId) {
     if (!plan?.id) return;
-    await del(`/api/meal-plans/${plan.id}/items/${itemId}`).catch(() => {});
+    // Optimistic remove, but keep a snapshot so we can roll back on failure.
+    const snapshot = plan.items;
     setPlan(p => ({ ...p, items: p.items.filter(i => i.id !== itemId) }));
+    try {
+      await del(`/api/meal-plans/${plan.id}/items/${itemId}`);
+    } catch (e) {
+      setPlan(p => ({ ...p, items: snapshot }));
+      Alert.alert('couldn’t remove that', e.message || 'try again in a moment.');
+    }
   }
 
   async function createPlan() {

@@ -64,7 +64,7 @@ export default function ShoppingScreen() {
       .map(cat => {
         const catItems = items.filter(i => i.category === cat && !i.checked);
         if (!catItems.length) return '';
-        return `${CAT_EMOJI[cat] || '•'} ${cat.toUpperCase()}\n${catItems.map(i => `  ${i.ingredient} ${i.quantity ? `(${i.quantity} ${i.unit || ''})`.trim() : ''}`).join('\n')}`;
+        return `${CAT_EMOJI[cat] || '•'} ${cat.toUpperCase()}\n${catItems.map(i => `  ${i.ingredient_name} ${i.quantity ? `(${i.quantity} ${i.unit || ''})`.trim() : ''}`).join('\n')}`;
       })
       .filter(Boolean)
       .join('\n\n');
@@ -165,7 +165,7 @@ export default function ShoppingScreen() {
                             flex: 1, fontSize: 14, color: item.checked ? '#9A8374' : '#3B2212',
                             textDecorationLine: item.checked ? 'line-through' : 'none',
                           }}>
-                            {item.ingredient}
+                            {item.ingredient_name}
                           </Text>
                           {(item.quantity || item.unit) && (
                             <Text style={{ fontSize: 12, color: '#9A8374' }}>{item.quantity} {item.unit}</Text>

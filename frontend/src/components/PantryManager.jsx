@@ -143,15 +143,18 @@ export default function PantryManager({ showToast }) {
 
   async function loadFood() {
     const res = await fetch('/api/pantry');
-    setFood(await res.json());
+    const data = res.ok ? await res.json() : [];
+    setFood(Array.isArray(data) ? data : []);
   }
   async function loadEquipment() {
     const res = await fetch('/api/equipment');
-    setEquipment(await res.json());
+    const data = res.ok ? await res.json() : [];
+    setEquipment(Array.isArray(data) ? data : []);
   }
   async function loadFreezer() {
     const res = await fetch('/api/freezer');
-    setFreezer(await res.json());
+    const data = res.ok ? await res.json() : [];
+    setFreezer(Array.isArray(data) ? data : []);
   }
   async function addFreezerItem() {
     if (!newFreezerName.trim()) return;

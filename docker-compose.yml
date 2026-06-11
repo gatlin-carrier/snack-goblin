@@ -1,6 +1,11 @@
 services:
   meal-planner:
-    build: .
+    build:
+      context: .
+      args:
+        # Baked into the frontend bundle at build time (see Dockerfile).
+        - VITE_SUPABASE_URL=${SUPABASE_URL:-}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}
     container_name: meal-planner
     restart: unless-stopped
     ports:
@@ -10,7 +15,13 @@ services:
     environment:
       - NODE_ENV=production
       - DB_PATH=/data/meal-planner.db
+      # CORS allow-list origin for the SPA (falls back to the lumi-server domain in code).
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-https://meal-planner.lumi-server.dev}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Optional alternative LLM providers (used if no DB-stored config exists).
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - INSTACART_API_KEY=${INSTACART_API_KEY:-}
       - KROGER_CLIENT_ID=${KROGER_CLIENT_ID:-}
       - KROGER_CLIENT_SECRET=${KROGER_CLIENT_SECRET:-}
@@ -22,6 +33,12 @@ services:
       - PASSKEY_ORIGIN=${PASSKEY_ORIGIN:-https://meal-planner.lumi-server.dev}
       # Shared bearer token for the Goblin Calendar read API (/api/external/v1/*)
       - INTEGRATION_TOKEN=${INTEGRATION_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3710/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     dns:
       - 8.8.8.8
       - 1.1.1.1

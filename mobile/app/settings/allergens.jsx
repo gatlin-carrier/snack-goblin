@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { get, post, del } from '../../lib/api';
 
-const ALLERGENS = ['peanuts','tree nuts','eggs','dairy','wheat','soy','fish','shellfish','sesame'];
+// Names must match the backend allowlist exactly (it's case-sensitive).
+const ALLERGENS = ['Peanuts','Tree Nuts','Eggs','Dairy','Wheat','Soy','Fish','Shellfish','Sesame'];
 const STATUSES = ['not introduced','introduced','passed','reaction'];
 const STATUS_COLORS = { 'not introduced':'#CFC2AE', introduced:'#C09E38', passed:'#6A9870', reaction:'#BC3838' };
 const REACTION_LEVELS = ['mild','moderate','severe'];
@@ -40,7 +41,7 @@ export default function AllergensScreen() {
           return (
             <View key={a} style={{ backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 18, padding: 14, gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ flex: 1, fontWeight: '700', color: '#3B2212', fontSize: 15 }}>{a}</Text>
+                <Text style={{ flex: 1, fontWeight: '700', color: '#3B2212', fontSize: 15, textTransform: 'lowercase' }}>{a}</Text>
                 <View style={{ backgroundColor: STATUS_COLORS[exp.status] + '30', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
                   <Text style={{ fontSize: 11, color: STATUS_COLORS[exp.status], fontWeight: '700' }}>{exp.status}</Text>
                 </View>
@@ -56,9 +57,9 @@ export default function AllergensScreen() {
               {exp.status === 'reaction' && (
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   {REACTION_LEVELS.map(lvl => (
-                    <TouchableOpacity key={lvl} onPress={() => updateAllergen(a, { reaction_level: lvl })}
-                      style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: exp.reaction_level === lvl ? '#BC3838' : 'rgba(200,185,165,0.3)' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: exp.reaction_level === lvl ? 'white' : '#7A6150' }}>{lvl}</Text>
+                    <TouchableOpacity key={lvl} onPress={() => updateAllergen(a, { reaction: lvl })}
+                      style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: exp.reaction === lvl ? '#BC3838' : 'rgba(200,185,165,0.3)' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: exp.reaction === lvl ? 'white' : '#7A6150' }}>{lvl}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

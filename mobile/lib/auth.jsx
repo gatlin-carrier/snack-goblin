@@ -29,12 +29,22 @@ export function AuthProvider({ children }) {
     });
 
     // Exchange PKCE code when app is opened via magic link.
-    // Only process our own auth-callback URLs that carry a fresh code — anything
-    // else (dev-client launch URLs, already-consumed links on reload) is ignored.
+    // Only process our own auth-callback URLs — parse out the `code` query param
+    // and exchange just that (not the whole URL). Surface provider errors when
+    // the redirect carries error_code/error_description instead of a code.
     async function handleDeepLink({ url }) {
       if (!url) return;
-      if (!url.startsWith('snack-goblin://auth-callback') || !url.includes('code=')) return;
-      const { error } = await supabase.auth.exchangeCodeForSession(url);
+      if (!url.startsWith('snack-goblin://auth-callback')) return;
+      const { queryParams } = Linking.parse(url);
+      const code = queryParams?.code;
+      const errCode = queryParams?.error_code;
+      const errDesc = queryParams?.error_description;
+      if (errCode || errDesc) {
+        setError(decodeURIComponent(String(errDesc || errCode)).replace(/\+/g, ' ').toLowerCase());
+        return;
+      }
+      if (!code) return;
+      const { error } = await supabase.auth.exchangeCodeForSession(String(code));
       if (error) {
         // PKCE verifier already consumed or expired — ask them to try again
         if (error.message?.includes('flow state')) {
@@ -66,8 +76,25 @@ export function AuthProvider({ children }) {
 
   async function signInWithProvider(provider) {
     setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({ provider });
-    if (error) setError(error.message);
+    // `signInWithOAuth` alone is a no-op on native — it never opens a browser.
+    // We ask Supabase for the URL (skipBrowserRedirect) and open it ourselves.
+    // The provider redirects back to snack-goblin://auth-callback?code=…, which
+    // `handleDeepLink` above picks up and exchanges for a session.
+    //
+    // TODO: once `expo-web-browser` is added as a dependency, switch to
+    // WebBrowser.openAuthSessionAsync(data.url, REDIRECT_URL) and feed the
+    // returned url's code through exchangeCodeForSession for a cleaner in-app
+    // session that auto-dismisses. Until then, Linking.openURL is the
+    // non-crashing fallback (kicks out to the system browser and back).
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: REDIRECT_URL, skipBrowserRedirect: true },
+    });
+    if (error) { setError(error.message); return; }
+    if (data?.url) {
+      try { await Linking.openURL(data.url); }
+      catch (e) { setError(e.message); }
+    }
   }
 
   async function signInWithApple() {

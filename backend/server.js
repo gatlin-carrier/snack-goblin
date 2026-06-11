@@ -8,6 +8,8 @@ const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const https = require('https');
 const http = require('http');
+const net = require('net');
+const dns = require('dns').promises;
 const { chat, chatMessages } = require('./llm');
 const { makeRequireAuth, getFounderUserId, SCOPED_TABLES } = require('./auth');
 const passkeys = require('./passkeys');
@@ -44,23 +46,119 @@ app.use('/api', apiLimiter);
 
 // ─── Security helpers ─────────────────────────────────────────────────────────
 
-// Block SSRF: reject private IPs, loopback, link-local, and non-http(s) schemes.
+// ─── SSRF protection ──────────────────────────────────────────────────────────
+// Two layers: a synchronous structural gate (isSafeExternalUrl) for store-time
+// validation, and an async safeFetch that resolves DNS and re-validates every
+// redirect hop so a public hostname can't point (or rebind) to a private IP.
+
+function ipv4ToInt(ip) {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let n = 0;
+  for (const p of parts) {
+    if (!/^\d+$/.test(p)) return null;
+    const o = Number(p);
+    if (o < 0 || o > 255) return null;
+    n = n * 256 + o;
+  }
+  return n >>> 0;
+}
+
+function isPrivateIPv4(ip) {
+  const n = ipv4ToInt(ip);
+  if (n === null) return true; // unparseable → treat as unsafe
+  const inRange = (base, bits) => (n >>> (32 - bits)) === (ipv4ToInt(base) >>> (32 - bits));
+  return (
+    inRange('0.0.0.0', 8) ||      // "this" network
+    inRange('10.0.0.0', 8) ||     // private
+    inRange('100.64.0.0', 10) ||  // CGNAT
+    inRange('127.0.0.0', 8) ||    // loopback
+    inRange('169.254.0.0', 16) || // link-local (incl. cloud metadata 169.254.169.254)
+    inRange('172.16.0.0', 12) ||  // private
+    inRange('192.0.0.0', 24) ||   // IETF protocol assignments
+    inRange('192.168.0.0', 16) || // private
+    inRange('198.18.0.0', 15) ||  // benchmarking
+    inRange('224.0.0.0', 4) ||    // multicast
+    inRange('240.0.0.0', 4)       // reserved
+  );
+}
+
+function isPrivateIPv6(ip) {
+  const addr = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  if (addr === '::1' || addr === '::') return true;
+  const mapped = addr.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (mapped) return isPrivateIPv4(mapped[1]);
+  if (/^f[cd]/.test(addr)) return true;   // unique local fc00::/7
+  if (/^fe[89ab]/.test(addr)) return true; // link-local fe80::/10
+  return false;
+}
+
+function isPrivateIP(ip) {
+  const fam = net.isIP(ip);
+  if (fam === 4) return isPrivateIPv4(ip);
+  if (fam === 6) return isPrivateIPv6(ip);
+  return true; // not a recognizable IP literal → unsafe here
+}
+
+// Synchronous structural gate. Rejects non-http(s), localhost, and any IP literal
+// (including decimal/octal/hex-packed and IPv4-mapped IPv6 forms) in a private range.
 function isSafeExternalUrl(raw) {
   let parsed;
   try { parsed = new URL(raw); } catch { return false; }
   if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-  const h = parsed.hostname.toLowerCase();
-  if (h === 'localhost') return false;
-  if (/^127\./.test(h)) return false;
-  if (/^0\.0\.0\.0/.test(h)) return false;
-  if (/^10\./.test(h)) return false;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
-  if (/^192\.168\./.test(h)) return false;
-  if (/^169\.254\./.test(h)) return false;
-  if (/^::1$/.test(h)) return false;
-  if (/^(fc|fd|fe80)[0-9a-f:]+/.test(h)) return false;
+  const bare = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!bare) return false;
+  if (bare === 'localhost' || bare.endsWith('.localhost')) return false;
+  // All-numeric or hex host = packed IPv4 (e.g. http://2130706433/ == 127.0.0.1) — reject.
+  if (/^(0x[0-9a-f]+|\d+)$/.test(bare)) return false;
+  if (net.isIP(bare)) return !isPrivateIP(bare);
   return true;
 }
+
+// Resolve a hostname and ensure no resolved address is private/loopback/link-local.
+async function assertPublicHost(hostname) {
+  const bare = hostname.replace(/^\[|\]$/g, '');
+  if (net.isIP(bare)) {
+    if (isPrivateIP(bare)) throw new Error('disallowed address');
+    return;
+  }
+  let addrs;
+  try { addrs = await dns.lookup(bare, { all: true }); }
+  catch { throw new Error('could not resolve host'); }
+  if (!addrs.length) throw new Error('host did not resolve');
+  for (const a of addrs) {
+    if (isPrivateIP(a.address)) throw new Error('host resolves to a disallowed address');
+  }
+}
+
+// Fetch that validates the URL, resolves DNS, and manually re-validates each
+// redirect hop. (Note: a determined attacker could still DNS-rebind between the
+// lookup and the connect; for this app's threat model that residual TOCTOU window
+// is acceptable. The checks below close decimal-IP, redirect-to-metadata, and
+// public-hostname-to-private-IP holes.)
+async function safeFetch(rawUrl, options = {}, depth = 0) {
+  if (depth > 4) throw new Error('too many redirects');
+  if (!isSafeExternalUrl(rawUrl)) throw new Error('disallowed URL');
+  const u = new URL(rawUrl);
+  await assertPublicHost(u.hostname);
+  const response = await fetch(rawUrl, { ...options, redirect: 'manual' });
+  if (response.status >= 300 && response.status < 400) {
+    const loc = response.headers.get('location');
+    if (!loc) return response;
+    const next = new URL(loc, rawUrl).toString();
+    return safeFetch(next, options, depth + 1);
+  }
+  return response;
+}
+
+// ─── Household scoping (multi-tenant isolation) ───────────────────────────────
+// Appended to WHERE clauses on household-scoped tables, with req.householdId
+// passed TWICE. In today's single-household deployment every row belongs to the
+// one household, so this is behavior-preserving; it isolates tenants if a second
+// household is ever created. When householdId is null (break-glass allowlist
+// user, or cron-written rows that predate a household) the `? IS NULL` arm
+// disables filtering so those rows remain accessible.
+const HH_SCOPE = '(household_id = ? OR ? IS NULL)';
 
 // Safe integer parse with bounds clamping.
 function clampInt(val, min, max, fallback) {
@@ -393,6 +491,10 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_user_passkeys_user ON user_passkeys(user_id);
 `);
+
+// Public health check — must be BEFORE the /api auth middleware so container
+// orchestration (Docker HEALTHCHECK, load balancers) can probe without a token.
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Public passkey routes — must be mounted BEFORE the /api auth middleware
 // so unauthenticated users can use Face ID to sign back in.
@@ -1121,8 +1223,7 @@ async function backgroundFetchImage(recipeId, name, cuisine, meal_type) {
 }
 
 // ─── Routes: Health ───────────────────────────────────────────────────────────
-
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// (GET /api/health is registered above, before the auth middleware.)
 
 app.get('/api/pexels/configured', (req, res) => {
   res.json({ configured: !!getPexelsKey() });
@@ -1163,7 +1264,7 @@ function getAnthropicSettings() {
   return null;
 }
 
-app.post('/api/recipes/refresh-prices', async (req, res) => {
+app.post('/api/recipes/refresh-prices', llmLimiter, async (req, res) => {
   const settings = getAnthropicSettings();
   if (!settings?.api_key) return res.status(400).json({ error: 'Anthropic API key not configured (needed for web search)' });
   if (priceRefreshInProgress) return res.status(409).json({ error: 'Price refresh already running' });
@@ -1216,7 +1317,7 @@ app.get('/api/recipes/refresh-prices/status', (req, res) => {
 // Backfill images for all recipes that don't have one yet.
 // Runs asynchronously and reports counts.
 let backfillInProgress = false;
-app.post('/api/recipes/backfill-images', async (req, res) => {
+app.post('/api/recipes/backfill-images', llmLimiter, async (req, res) => {
   if (!getPexelsKey()) return res.status(400).json({ error: 'Pexels API key not configured' });
   if (backfillInProgress) return res.status(409).json({ error: 'Backfill already running' });
   const recipes = db.prepare('SELECT id, name, cuisine, meal_type FROM recipes WHERE image_url IS NULL').all();
@@ -1281,13 +1382,18 @@ app.post('/api/recipes/import-url', llmLimiter, async (req, res) => {
   if (!isSafeExternalUrl(url)) return res.status(400).json({ error: 'Invalid or disallowed URL' });
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MealPlanner/1.0; +https://meal-planner.lumi-server.dev)',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(15000),
-    });
+    let response;
+    try {
+      response = await safeFetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MealPlanner/1.0; +https://meal-planner.lumi-server.dev)',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid or disallowed URL' });
+    }
     if (!response.ok) return res.status(400).json({ error: `Failed to fetch URL: ${response.status}` });
     const html = await response.text();
 
@@ -1385,8 +1491,8 @@ app.post('/api/recipes/generate', llmLimiter, async (req, res) => {
 
 app.get('/api/recipes', (req, res) => {
   try {
-    let query = 'SELECT * FROM recipes WHERE 1=1';
-    const params = [];
+    let query = `SELECT * FROM recipes WHERE ${HH_SCOPE}`;
+    const params = [req.householdId, req.householdId];
     if (req.query.meal_type) { query += ' AND meal_type = ?'; params.push(req.query.meal_type); }
     if (req.query.toddler_safe) { query += ' AND toddler_safe = 1'; }
     if (req.query.cuisine) { query += ' AND cuisine LIKE ?'; params.push(`%${req.query.cuisine}%`); }
@@ -1418,8 +1524,8 @@ app.get('/api/recipes/recommendations', (req, res) => {
     const likedCuisines = prefs.cuisines.liked;
     const excludedCuisines = prefs.cuisines.excluded;
 
-    let query = `SELECT * FROM recipes WHERE in_rotation = 1`;
-    const params = [];
+    let query = `SELECT * FROM recipes WHERE in_rotation = 1 AND ${HH_SCOPE}`;
+    const params = [req.householdId, req.householdId];
     if (mealType) { query += ' AND meal_type = ?'; params.push(mealType); }
     if (excludedCuisines.length) {
       query += ` AND cuisine NOT IN (${excludedCuisines.map(() => '?').join(',')})`;
@@ -1450,7 +1556,7 @@ app.get('/api/recipes/recommendations', (req, res) => {
 });
 
 app.get('/api/recipes/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id);
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
   if (!row) return res.status(404).json({ error: 'Not found' });
   res.json(parseRecipeRow(row));
 });
@@ -1458,8 +1564,9 @@ app.get('/api/recipes/:id', (req, res) => {
 app.post('/api/recipes/:id/rate', (req, res) => {
   try {
     const stars = Number(req.body.stars);
-    if (stars < 1 || stars > 5) return res.status(400).json({ error: 'stars must be 1-5' });
-    const recipe = db.prepare('SELECT star_rating, rating_count FROM recipes WHERE id = ?').get(req.params.id);
+    // Reject NaN explicitly — NaN comparisons are always false, so `< 1 || > 5` lets it through.
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) return res.status(400).json({ error: 'stars must be an integer 1-5' });
+    const recipe = db.prepare(`SELECT star_rating, rating_count FROM recipes WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     if (!recipe) return res.status(404).json({ error: 'Not found' });
 
     const newCount = (recipe.rating_count || 0) + 1;
@@ -1468,8 +1575,8 @@ app.post('/api/recipes/:id/rate', (req, res) => {
     const inRotation = newRating < 2 && newCount >= 2 ? 0 : 1;
 
     db.prepare(`
-      UPDATE recipes SET star_rating = ?, rating_count = ?, in_rotation = ? WHERE id = ?
-    `).run(newRating, newCount, inRotation, req.params.id);
+      UPDATE recipes SET star_rating = ?, rating_count = ?, in_rotation = ? WHERE id = ? AND ${HH_SCOPE}
+    `).run(newRating, newCount, inRotation, req.params.id, req.householdId, req.householdId);
 
     res.json({ star_rating: newRating, rating_count: newCount, in_rotation: inRotation });
   } catch (err) {
@@ -1481,7 +1588,7 @@ app.patch('/api/recipes/:id', (req, res) => {
   try {
     const { in_rotation } = req.body;
     if (in_rotation !== undefined) {
-      db.prepare('UPDATE recipes SET in_rotation = ? WHERE id = ?').run(in_rotation ? 1 : 0, req.params.id);
+      db.prepare(`UPDATE recipes SET in_rotation = ? WHERE id = ? AND ${HH_SCOPE}`).run(in_rotation ? 1 : 0, req.params.id, req.householdId, req.householdId);
     }
     res.json({ ok: true });
   } catch (err) {
@@ -1491,7 +1598,7 @@ app.patch('/api/recipes/:id', (req, res) => {
 
 app.put('/api/recipes/:id', (req, res) => {
   try {
-    const row = db.prepare('SELECT id FROM recipes WHERE id = ?').get(req.params.id);
+    const row = db.prepare(`SELECT id FROM recipes WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     if (!row) return res.status(404).json({ error: 'Not found' });
 
     const {
@@ -1525,10 +1632,10 @@ app.put('/api/recipes/:id', (req, res) => {
 
     if (fields.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
 
-    params.push(req.params.id);
-    db.prepare(`UPDATE recipes SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    params.push(req.params.id, req.householdId, req.householdId);
+    db.prepare(`UPDATE recipes SET ${fields.join(', ')} WHERE id = ? AND ${HH_SCOPE}`).run(...params);
 
-    const updated = db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id);
+    const updated = db.prepare(`SELECT * FROM recipes WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     res.json(parseRecipeRow(updated));
   } catch (err) {
     res.status(500).json({ error: safeError(err) });
@@ -1536,14 +1643,14 @@ app.put('/api/recipes/:id', (req, res) => {
 });
 
 app.delete('/api/recipes/:id', (req, res) => {
-  db.prepare('DELETE FROM recipes WHERE id = ?').run(req.params.id);
+  db.prepare(`DELETE FROM recipes WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 
 // ─── Routes: Collections ──────────────────────────────────────────────────────
 
 app.get('/api/collections', (req, res) => {
-  const cols = db.prepare('SELECT c.*, COUNT(cr.recipe_id) as recipe_count FROM collections c LEFT JOIN collection_recipes cr ON cr.collection_id = c.id GROUP BY c.id ORDER BY c.name').all();
+  const cols = db.prepare(`SELECT c.*, COUNT(cr.recipe_id) as recipe_count FROM collections c LEFT JOIN collection_recipes cr ON cr.collection_id = c.id WHERE (c.household_id = ? OR ? IS NULL) GROUP BY c.id ORDER BY c.name`).all(req.householdId, req.householdId);
   res.json(cols);
 });
 
@@ -1560,7 +1667,7 @@ app.post('/api/collections', (req, res) => {
 });
 
 app.delete('/api/collections/:id', (req, res) => {
-  db.prepare('DELETE FROM collections WHERE id = ?').run(req.params.id);
+  db.prepare(`DELETE FROM collections WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 
@@ -1568,9 +1675,9 @@ app.get('/api/collections/:id/recipes', (req, res) => {
   const rows = db.prepare(`
     SELECT r.* FROM recipes r
     JOIN collection_recipes cr ON cr.recipe_id = r.id
-    WHERE cr.collection_id = ?
+    WHERE cr.collection_id = ? AND (r.household_id = ? OR ? IS NULL)
     ORDER BY r.name
-  `).all(req.params.id);
+  `).all(req.params.id, req.householdId, req.householdId);
   res.json(rows.map(parseRecipeRow));
 });
 
@@ -1616,7 +1723,7 @@ app.post('/api/preferences', (req, res) => {
 app.delete('/api/preferences', (req, res) => {
   try {
     const { type, name } = req.body;
-    db.prepare('DELETE FROM preferences WHERE type = ? AND name = ?').run(type, name);
+    db.prepare(`DELETE FROM preferences WHERE type = ? AND name = ? AND ${HH_SCOPE}`).run(type, name, req.householdId, req.householdId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: safeError(err) });
@@ -1628,7 +1735,7 @@ app.delete('/api/preferences', (req, res) => {
 app.get('/api/meal-plans/current', (req, res) => {
   try {
     const monday = getMonday(new Date());
-    let plan = db.prepare('SELECT * FROM meal_plans WHERE week_start = ?').get(monday);
+    let plan = db.prepare(`SELECT * FROM meal_plans WHERE week_start = ? AND ${HH_SCOPE}`).get(monday, req.householdId, req.householdId);
     if (!plan) {
       const result = db.prepare("INSERT INTO meal_plans (week_start, status, user_id, household_id) VALUES (?, 'draft', ?, ?)").run(monday, req.userId, req.householdId);
       plan = db.prepare('SELECT * FROM meal_plans WHERE id = ?').get(result.lastInsertRowid);
@@ -1662,7 +1769,7 @@ app.get('/api/meal-plans/current', (req, res) => {
 });
 
 app.get('/api/meal-plans', (req, res) => {
-  res.json(db.prepare('SELECT * FROM meal_plans ORDER BY week_start DESC LIMIT 20').all());
+  res.json(db.prepare(`SELECT * FROM meal_plans WHERE ${HH_SCOPE} ORDER BY week_start DESC LIMIT 20`).all(req.householdId, req.householdId));
 });
 
 app.post('/api/meal-plans', (req, res) => {
@@ -1722,7 +1829,7 @@ app.delete('/api/meal-plans/:id/items/:itemId', (req, res) => {
 app.post('/api/meal-plans/:id/auto-curate', (req, res) => {
   try {
     const planId = Number(req.params.id);
-    const plan = db.prepare('SELECT id FROM meal_plans WHERE id = ?').get(planId);
+    const plan = db.prepare(`SELECT id FROM meal_plans WHERE id = ? AND ${HH_SCOPE}`).get(planId, req.householdId, req.householdId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
     const strategy = ['top-rated', 'novelty', 'overlap'].includes(req.body.strategy) ? req.body.strategy : 'overlap';
@@ -2038,7 +2145,7 @@ app.post('/api/meal-plans/from-template/:id', (req, res) => {
       const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
       return d.toISOString().slice(0, 10);
     })();
-    let plan = db.prepare('SELECT * FROM meal_plans WHERE week_start = ?').get(monday);
+    let plan = db.prepare(`SELECT * FROM meal_plans WHERE week_start = ? AND ${HH_SCOPE}`).get(monday, req.householdId, req.householdId);
     if (!plan) {
       const r = db.prepare("INSERT INTO meal_plans (week_start, status, user_id, household_id) VALUES (?, 'draft', ?, ?)").run(monday, req.userId, req.householdId);
       plan = db.prepare('SELECT * FROM meal_plans WHERE id = ?').get(r.lastInsertRowid);
@@ -2100,7 +2207,7 @@ app.post('/api/shopping-lists', (req, res) => {
 
 app.get('/api/shopping-lists/:id', (req, res) => {
   try {
-    const list = db.prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.id);
+    const list = db.prepare(`SELECT * FROM shopping_lists WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     if (!list) return res.status(404).json({ error: 'Not found' });
     const items = db.prepare('SELECT * FROM shopping_list_items WHERE shopping_list_id = ? ORDER BY category, ingredient_name').all(req.params.id);
     res.json({ ...list, items });
@@ -2111,7 +2218,7 @@ app.get('/api/shopping-lists/:id', (req, res) => {
 
 app.get('/api/shopping-lists/for-plan/:planId', (req, res) => {
   try {
-    const list = db.prepare('SELECT * FROM shopping_lists WHERE meal_plan_id = ? ORDER BY created_at DESC LIMIT 1').get(req.params.planId);
+    const list = db.prepare(`SELECT * FROM shopping_lists WHERE meal_plan_id = ? AND ${HH_SCOPE} ORDER BY created_at DESC LIMIT 1`).get(req.params.planId, req.householdId, req.householdId);
     if (!list) return res.json(null);
     const items = db.prepare('SELECT * FROM shopping_list_items WHERE shopping_list_id = ? ORDER BY category, ingredient_name').all(list.id);
     res.json({ ...list, items });
@@ -2131,7 +2238,7 @@ app.patch('/api/shopping-lists/:id/items/:itemId', (req, res) => {
 
 app.get('/api/shopping-lists/:id/export', (req, res) => {
   try {
-    const list = db.prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.id);
+    const list = db.prepare(`SELECT * FROM shopping_lists WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     if (!list) return res.status(404).json({ error: 'Not found' });
     const items = db.prepare('SELECT * FROM shopping_list_items WHERE shopping_list_id = ? ORDER BY category, ingredient_name').all(req.params.id);
     const LABELS = { produce: '🥦 Produce', meat: '🥩 Meat & Poultry', seafood: '🐟 Seafood', dairy: '🧀 Dairy & Eggs', frozen: '🧊 Frozen', bakery: '🍞 Bakery', pantry: '🫙 Pantry & Dry Goods' };
@@ -2159,7 +2266,7 @@ app.post('/api/shopping-lists/:id/send/instacart', async (req, res) => {
   try {
     const apiKey = process.env.INSTACART_API_KEY;
     if (!apiKey) return res.status(400).json({ error: 'INSTACART_API_KEY not configured' });
-    const list = db.prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.id);
+    const list = db.prepare(`SELECT * FROM shopping_lists WHERE id = ? AND ${HH_SCOPE}`).get(req.params.id, req.householdId, req.householdId);
     if (!list) return res.status(404).json({ error: 'Not found' });
     const items = db.prepare('SELECT * FROM shopping_list_items WHERE shopping_list_id = ? AND checked = 0 ORDER BY category, ingredient_name').all(req.params.id);
     if (!items.length) return res.status(400).json({ error: 'No unchecked items' });
@@ -2385,7 +2492,7 @@ Rules:
 
 // ─── Routes: Pantry ───────────────────────────────────────────────────────────
 
-app.get('/api/pantry', (req, res) => res.json(db.prepare('SELECT * FROM pantry_items ORDER BY category, ingredient_name').all()));
+app.get('/api/pantry', (req, res) => res.json(db.prepare(`SELECT * FROM pantry_items WHERE ${HH_SCOPE} ORDER BY category, ingredient_name`).all(req.householdId, req.householdId)));
 
 app.post('/api/pantry', (req, res) => {
   try {
@@ -2398,16 +2505,16 @@ app.post('/api/pantry', (req, res) => {
 app.patch('/api/pantry/:id', (req, res) => {
   try {
     const { quantity, unit, category, notes } = req.body;
-    db.prepare('UPDATE pantry_items SET quantity=?, unit=?, category=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(quantity || null, unit || null, category || 'pantry', notes || null, req.params.id);
+    db.prepare(`UPDATE pantry_items SET quantity=?, unit=?, category=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND ${HH_SCOPE}`).run(quantity || null, unit || null, category || 'pantry', notes || null, req.params.id, req.householdId, req.householdId);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
 
-app.delete('/api/pantry/:id', (req, res) => { db.prepare('DELETE FROM pantry_items WHERE id = ?').run(req.params.id); res.json({ ok: true }); });
+app.delete('/api/pantry/:id', (req, res) => { db.prepare(`DELETE FROM pantry_items WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId); res.json({ ok: true }); });
 
 // ─── Routes: Equipment ────────────────────────────────────────────────────────
 
-app.get('/api/equipment', (req, res) => res.json(db.prepare('SELECT * FROM equipment ORDER BY name').all()));
+app.get('/api/equipment', (req, res) => res.json(db.prepare(`SELECT * FROM equipment WHERE ${HH_SCOPE} ORDER BY name`).all(req.householdId, req.householdId)));
 
 app.post('/api/equipment', (req, res) => {
   try {
@@ -2421,19 +2528,19 @@ app.post('/api/equipment', (req, res) => {
 app.patch('/api/equipment/:id', (req, res) => {
   try {
     const { name, notes } = req.body;
-    db.prepare('UPDATE equipment SET name=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(name, notes || null, req.params.id);
+    db.prepare(`UPDATE equipment SET name=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND ${HH_SCOPE}`).run(name, notes || null, req.params.id, req.householdId, req.householdId);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
 
-app.delete('/api/equipment/:id', (req, res) => { db.prepare('DELETE FROM equipment WHERE id = ?').run(req.params.id); res.json({ ok: true }); });
+app.delete('/api/equipment/:id', (req, res) => { db.prepare(`DELETE FROM equipment WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId); res.json({ ok: true }); });
 
 // ─── Routes: Allergens ───────────────────────────────────────────────────────
 
 const ALLERGENS = ['Peanuts','Tree Nuts','Eggs','Dairy','Wheat','Soy','Fish','Shellfish','Sesame'];
 
 app.get('/api/allergens', (req, res) => {
-  const rows = db.prepare('SELECT * FROM allergen_exposures ORDER BY allergen').all();
+  const rows = db.prepare(`SELECT * FROM allergen_exposures WHERE ${HH_SCOPE} ORDER BY allergen`).all(req.householdId, req.householdId);
   const map = {};
   for (const r of rows) map[r.allergen] = r;
   res.json(ALLERGENS.map(a => map[a] || { allergen: a, status: 'not_introduced', first_introduced_date: null, last_in_plan_date: null, reaction: null, notes: null }));
@@ -2452,7 +2559,7 @@ app.post('/api/allergens', (req, res) => {
 });
 
 app.delete('/api/allergens/:allergen', (req, res) => {
-  db.prepare('DELETE FROM allergen_exposures WHERE allergen = ?').run(req.params.allergen);
+  db.prepare(`DELETE FROM allergen_exposures WHERE allergen = ? AND ${HH_SCOPE}`).run(req.params.allergen, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 
@@ -3116,7 +3223,7 @@ cron.schedule('0 18 * * 0', async () => {
       click: 'https://meal-planner.lumi-server.dev',
     });
   } catch (e) { console.error('[cron] Weekly generation failed:', e.message); }
-}, { timezone: 'America/Chicago' });
+}, { timezone: process.env.CRON_TZ || 'America/Chicago' });
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
@@ -3129,8 +3236,8 @@ function getMonday(date) {
 
 // ─── Routes: Freezer ─────────────────────────────────────────────────────────
 
-app.get('/api/freezer', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM freezer_items ORDER BY use_by_date ASC, created_at DESC').all());
+app.get('/api/freezer', (req, res) => {
+  res.json(db.prepare(`SELECT * FROM freezer_items WHERE ${HH_SCOPE} ORDER BY use_by_date ASC, created_at DESC`).all(req.householdId, req.householdId));
 });
 
 app.post('/api/freezer', (req, res) => {
@@ -3147,14 +3254,14 @@ app.post('/api/freezer', (req, res) => {
 });
 
 app.delete('/api/freezer/:id', (req, res) => {
-  db.prepare('DELETE FROM freezer_items WHERE id = ?').run(req.params.id);
+  db.prepare(`DELETE FROM freezer_items WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 
 // ─── Routes: Leftovers ────────────────────────────────────────────────────────
 
-app.get('/api/leftovers', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM leftovers ORDER BY use_by_date ASC, created_at DESC').all());
+app.get('/api/leftovers', (req, res) => {
+  res.json(db.prepare(`SELECT * FROM leftovers WHERE ${HH_SCOPE} ORDER BY use_by_date ASC, created_at DESC`).all(req.householdId, req.householdId));
 });
 
 app.post('/api/leftovers', (req, res) => {
@@ -3174,23 +3281,23 @@ app.patch('/api/leftovers/:id', (req, res) => {
   try {
     const { servings_remaining } = req.body;
     if (servings_remaining <= 0) {
-      db.prepare('DELETE FROM leftovers WHERE id = ?').run(req.params.id);
+      db.prepare(`DELETE FROM leftovers WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
     } else {
-      db.prepare('UPDATE leftovers SET servings_remaining = ? WHERE id = ?').run(servings_remaining, req.params.id);
+      db.prepare(`UPDATE leftovers SET servings_remaining = ? WHERE id = ? AND ${HH_SCOPE}`).run(servings_remaining, req.params.id, req.householdId, req.householdId);
     }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: safeError(err) }); }
 });
 
 app.delete('/api/leftovers/:id', (req, res) => {
-  db.prepare('DELETE FROM leftovers WHERE id = ?').run(req.params.id);
+  db.prepare(`DELETE FROM leftovers WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 
 // ─── Routes: First Foods ──────────────────────────────────────────────────────
 
-app.get('/api/first-foods', (_req, res) => {
-  res.json(db.prepare('SELECT * FROM first_foods ORDER BY date_tried DESC, created_at DESC').all());
+app.get('/api/first-foods', (req, res) => {
+  res.json(db.prepare(`SELECT * FROM first_foods WHERE ${HH_SCOPE} ORDER BY date_tried DESC, created_at DESC`).all(req.householdId, req.householdId));
 });
 
 app.post('/api/first-foods', (req, res) => {
@@ -3206,7 +3313,7 @@ app.post('/api/first-foods', (req, res) => {
 });
 
 app.delete('/api/first-foods/:id', (req, res) => {
-  db.prepare('DELETE FROM first_foods WHERE id = ?').run(req.params.id);
+  db.prepare(`DELETE FROM first_foods WHERE id = ? AND ${HH_SCOPE}`).run(req.params.id, req.householdId, req.householdId);
   res.json({ ok: true });
 });
 

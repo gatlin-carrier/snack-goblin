@@ -30,6 +30,14 @@ export default function CookModeScreen() {
     return () => clearInterval(timerRef.current);
   }, [timerRunning]);
 
+  // Reset the timer when moving between steps so a previous step's countdown
+  // doesn't carry over into the next one.
+  useEffect(() => {
+    setTimerSec(null);
+    setElapsed(0);
+    setTimerRunning(false);
+  }, [step]);
+
   function detectTimer(text) {
     const m = text?.match(/(\d+)\s*(?:to\s*\d+\s*)?(?:minute|min)/i);
     return m ? parseInt(m[1]) * 60 : null;

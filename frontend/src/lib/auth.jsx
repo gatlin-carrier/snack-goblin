@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase.js';
 
 const AuthCtx = createContext(null);
@@ -23,12 +23,11 @@ if (typeof window !== 'undefined' && !window.__mealhouseFetchPatched) {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined);
   const [error, setError] = useState(null);
-  const initRan = useRef(false);
 
   useEffect(() => {
-    if (initRan.current) return;
-    initRan.current = true;
-
+    // No ref-guard here: under React 18 StrictMode the effect runs mount→cleanup
+    // →mount. A ref guard would skip the second subscribe after the first was torn
+    // down, leaving no auth listener (sign-in + token refresh would never update).
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) setError(error.message);
       currentToken = data?.session?.access_token || null;

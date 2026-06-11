@@ -12,16 +12,16 @@ export default function NotificationsScreen() {
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
+    // Settings are stored as flat allowlisted keys, not a nested ntfy object.
     get('/api/settings').then(d => {
-      const s = d?.ntfy || {};
-      setUrl(s.server_url || '');
-      setTopic(s.topic || '');
+      setUrl(d?.ntfy_url || '');
+      setTopic(d?.ntfy_topic || '');
     }).catch(() => {});
   }, []);
 
   async function save() {
     setSaving(true);
-    await post('/api/settings', { ntfy: { server_url: url, topic } }).catch(() => {});
+    await post('/api/settings', { ntfy_url: url, ntfy_topic: topic }).catch(() => {});
     setSaving(false);
     router.back();
   }

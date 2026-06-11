@@ -39,12 +39,23 @@ export default function OnboardingScreen() {
   }
 
   async function finish() {
-    await post('/api/preferences', { excluded_cuisines: excludedCuisines, comfort_meal_type: comfortMeal }).catch(() => {});
-    if (members.length) {
-      await post('/api/household/invite-bulk', { members }).catch(() => {});
+    try {
+      // /api/preferences takes one {type, name, preference} per cuisine.
+      for (const c of excludedCuisines) {
+        await post('/api/preferences', { type: 'cuisine', name: c, preference: 'excluded' });
+      }
+      // /api/household/invite-bulk wants { invites: [{ email, display_name }] }.
+      if (members.length) {
+        await post('/api/household/invite-bulk', {
+          invites: members.map(m => ({ email: m.email, display_name: m.name })),
+        });
+      }
+      // comfort_meal_type isn't a cuisine/ingredient — it lives in user-prefs.
+      await update({ energy_level: energy, onboarding_complete: true, excluded_cuisines: excludedCuisines, comfort_meal_type: comfortMeal });
+      router.replace('/(tabs)');
+    } catch (e) {
+      Alert.alert('hmm, that didn’t save', e.message || 'something went wrong. try again?');
     }
-    await update({ energy_level: energy, onboarding_complete: true, excluded_cuisines: excludedCuisines, comfort_meal_type: comfortMeal });
-    router.replace('/(tabs)');
   }
 
   const steps = [

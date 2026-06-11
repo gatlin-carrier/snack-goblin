@@ -1,15 +1,62 @@
 import { currentToken } from './auth';
+import { supabase } from './supabase';
 
-const BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3710';
+function resolveBase() {
+  const fromEnv = process.env.EXPO_PUBLIC_API_URL;
+  if (fromEnv) return fromEnv;
+  if (!__DEV__) {
+    console.warn(
+      '[api] EXPO_PUBLIC_API_URL is not set in a production build — ' +
+      'falling back to http://localhost:3710, which will not reach a real server.'
+    );
+  }
+  return 'http://localhost:3710';
+}
 
-export async function api(path, options = {}) {
-  const token = currentToken;
+const BASE = resolveBase();
+const TIMEOUT_MS = 20000;
+
+// Pull the freshest token we can: prefer the live session (which auto-refreshes),
+// fall back to the module-level token captured by the auth listener.
+async function freshToken() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || currentToken;
+  } catch {
+    return currentToken;
+  }
+}
+
+async function doFetch(path, options, token) {
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function api(path, options = {}) {
+  let token = await freshToken();
+  let res = await doFetch(path, options, token);
+
+  // On a 401, the token may be stale — refresh the session once and retry.
+  if (res.status === 401) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const retried = data?.session?.access_token;
+      if (retried && retried !== token) {
+        res = await doFetch(path, options, retried);
+      }
+    } catch {}
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { status: res.status });

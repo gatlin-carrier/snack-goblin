@@ -20,8 +20,10 @@ export default function MealHistory() {
 
   useEffect(() => {
     fetch('/api/cook-history?limit=50')
-      .then(r => r.json())
-      .then(data => { setHistory(data); setLoading(false); });
+      .then(r => (r.ok ? r.json() : []))
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => setHistory([]))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="page"><div style={{ color: THEME.dim, display: 'flex', gap: 10 }}><div className="spinner" /> Loading…</div></div>;

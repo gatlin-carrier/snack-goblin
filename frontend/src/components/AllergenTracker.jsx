@@ -134,9 +134,13 @@ export default function AllergenTracker({ showToast }) {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/allergens');
-    setAllergens(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch('/api/allergens');
+      const data = res.ok ? await res.json() : [];
+      setAllergens(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const introduced = allergens.filter(a => a.status !== 'not_introduced').length;

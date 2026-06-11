@@ -26,7 +26,12 @@ export default function RecipesScreen() {
 
   async function load() {
     try {
-      const params = new URLSearchParams({ sort, rotation });
+      // Map the UI pills to the backend's param names/values.
+      const SORT_MAP = { 'top-rated': 'rating', cheapest: 'cost' };
+      const params = new URLSearchParams();
+      const backendSort = SORT_MAP[sort];
+      if (backendSort) params.set('sort', backendSort);
+      params.set('in_rotation', rotation === 'paused' ? '0' : '1');
       if (mealType !== 'all') params.set('meal_type', mealType);
       const [data, planData] = await Promise.all([
         get(`/api/recipes?${params}`),

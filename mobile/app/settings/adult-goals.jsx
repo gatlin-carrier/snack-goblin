@@ -5,28 +5,39 @@ import { useRouter } from 'expo-router';
 import { get, post } from '../../lib/api';
 
 const PRESETS = [
-  { label: 'moderate', calories: 2000, protein: 50, iron: 18 },
-  { label: 'active', calories: 2400, protein: 80, iron: 18 },
-  { label: 'high protein', calories: 2200, protein: 120, iron: 18 },
+  { label: 'moderate', calories: 2000, protein_g: 50, iron_mg: 18 },
+  { label: 'active', calories: 2400, protein_g: 80, iron_mg: 18 },
+  { label: 'high protein', calories: 2200, protein_g: 120, iron_mg: 18 },
 ];
 
 export default function AdultGoalsScreen() {
   const router = useRouter();
-  const [goals, setGoals] = useState({ calories: '', protein: '', iron: '', omega3_dha: '', weekly_budget: '' });
+  const [goals, setGoals] = useState({ calories: '', protein_g: '', iron_mg: '', omega3_mg: '', weekly_budget_usd: '' });
 
   useEffect(() => {
     get('/api/adult-goals').then(d => {
-      if (d) setGoals({ calories: d.calories?.toString() || '', protein: d.protein?.toString() || '', iron: d.iron?.toString() || '', omega3_dha: d.omega3_dha?.toString() || '', weekly_budget: d.weekly_budget?.toString() || '' });
+      if (d) setGoals({
+        calories: d.calories?.toString() || '',
+        protein_g: d.protein_g?.toString() || '',
+        iron_mg: d.iron_mg?.toString() || '',
+        omega3_mg: d.omega3_mg?.toString() || '',
+        weekly_budget_usd: d.weekly_budget_usd?.toString() || '',
+      });
     }).catch(() => {});
   }, []);
 
   function applyPreset(p) {
-    setGoals(g => ({ ...g, calories: p.calories.toString(), protein: p.protein.toString(), iron: p.iron.toString() }));
+    setGoals(g => ({ ...g, calories: p.calories.toString(), protein_g: p.protein_g.toString(), iron_mg: p.iron_mg.toString() }));
   }
 
   async function save() {
+    // Send every field — the backend resets any omitted field to its default
+    // (Number(undefined) || DEFAULT), so we always echo the full current state.
     const payload = {};
-    Object.entries(goals).forEach(([k, v]) => { if (v) payload[k] = parseFloat(v); });
+    Object.entries(goals).forEach(([k, v]) => {
+      const n = parseFloat(v);
+      if (Number.isFinite(n)) payload[k] = n;
+    });
     await post('/api/adult-goals', payload).catch(() => {});
     router.back();
   }
@@ -50,10 +61,10 @@ export default function AdultGoalsScreen() {
 
         {[
           { key: 'calories', label: 'daily calories', placeholder: '2000', unit: 'kcal' },
-          { key: 'protein', label: 'daily protein', placeholder: '50', unit: 'g' },
-          { key: 'iron', label: 'daily iron', placeholder: '18', unit: 'mg' },
-          { key: 'omega3_dha', label: 'omega-3 / DHA', placeholder: '250', unit: 'mg' },
-          { key: 'weekly_budget', label: 'weekly grocery budget', placeholder: '150', unit: '$' },
+          { key: 'protein_g', label: 'daily protein', placeholder: '50', unit: 'g' },
+          { key: 'iron_mg', label: 'daily iron', placeholder: '18', unit: 'mg' },
+          { key: 'omega3_mg', label: 'omega-3 / DHA', placeholder: '250', unit: 'mg' },
+          { key: 'weekly_budget_usd', label: 'weekly grocery budget', placeholder: '150', unit: '$' },
         ].map(f => (
           <View key={f.key} className="gap-2">
             <Text className="text-goblin-dim text-xs font-bold tracking-wider uppercase">{f.label}</Text>

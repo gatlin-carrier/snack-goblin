@@ -22,7 +22,7 @@ export default function FirstFoodsScreen() {
     const f = name || food.trim();
     if (!f) return;
     const today = new Date().toISOString().split('T')[0];
-    const entry = await post('/api/first-foods', { food: f, reaction_level: reaction, date: today }).catch(() => null);
+    const entry = await post('/api/first-foods', { food_name: f, reaction, date_tried: today }).catch(() => null);
     if (entry) setEntries(prev => [entry, ...prev]);
     setFood('');
   }
@@ -72,9 +72,9 @@ export default function FirstFoodsScreen() {
         }
         renderItem={({ item }) => (
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 14, padding: 13 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: REACTION_COLORS[item.reaction_level || 'none'], marginRight: 12 }}/>
-            <Text style={{ flex: 1, color: '#3B2212', fontSize: 14, fontWeight: '500' }}>{item.food}</Text>
-            <Text style={{ color: '#9A8374', fontSize: 12, marginRight: 10 }}>{item.date}</Text>
+            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: REACTION_COLORS[item.reaction || 'none'], marginRight: 12 }}/>
+            <Text style={{ flex: 1, color: '#3B2212', fontSize: 14, fontWeight: '500' }}>{item.food_name}</Text>
+            <Text style={{ color: '#9A8374', fontSize: 12, marginRight: 10 }}>{item.date_tried}</Text>
             <TouchableOpacity onPress={() => remove(item.id)}><Text style={{ color: '#9A8374', fontSize: 16 }}>×</Text></TouchableOpacity>
           </View>
         )}

@@ -33,9 +33,13 @@ export default function FirstFoodsLog({ showToast }) {
 
   async function load() {
     setLoading(true);
-    const res = await fetch('/api/first-foods');
-    setFoods(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch('/api/first-foods');
+      const data = res.ok ? await res.json() : [];
+      setFoods(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addFood() {

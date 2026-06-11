@@ -20,7 +20,7 @@ export default function LLMSettingsScreen() {
   const router = useRouter();
   const [configs, setConfigs] = useState([]);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ provider: 'anthropic', model: '', api_key: '', label: '' });
+  const [form, setForm] = useState({ provider: 'anthropic', model: '', api_key: '', name: '' });
   const [testing, setTesting] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,14 +29,20 @@ export default function LLMSettingsScreen() {
   }, []);
 
   async function save() {
-    if (editing) {
-      const updated = await put(`/api/llm-configs/${editing}`, form).catch(() => null);
-      if (updated) setConfigs(c => c.map(x => x.id === editing ? updated : x));
-    } else {
-      const created = await post('/api/llm-configs', form).catch(() => null);
-      if (created) setConfigs(c => [...c, created]);
+    // Backend requires `name` (400 otherwise) — fall back to the provider.
+    const payload = { ...form, name: form.name?.trim() || form.provider };
+    try {
+      if (editing) {
+        const updated = await put(`/api/llm-configs/${editing}`, payload);
+        setConfigs(c => c.map(x => x.id === editing ? updated : x));
+      } else {
+        const created = await post('/api/llm-configs', payload);
+        setConfigs(c => [...c, created]);
+      }
+      setEditing(null); setForm({ provider: 'anthropic', model: '', api_key: '', name: '' });
+    } catch (e) {
+      Alert.alert('couldn’t save', e.message);
     }
-    setEditing(null); setForm({ provider: 'anthropic', model: '', api_key: '', label: '' });
   }
 
   async function activate(id) {
@@ -47,8 +53,10 @@ export default function LLMSettingsScreen() {
   async function testConfig(id) {
     setTesting(id);
     try {
-      const res = await post(`/api/llm-configs/${id}/test`, {});
-      Alert.alert('connection ok', res.message || 'model responded successfully.');
+      // Test always returns HTTP 200: { ok, response } on success, { ok:false, error } on failure.
+      const data = await post(`/api/llm-configs/${id}/test`, {});
+      if (data.ok) Alert.alert('connection ok', data.response || 'model responded successfully.');
+      else Alert.alert('test failed', data.error || 'no response from the model.');
     } catch (e) {
       Alert.alert('test failed', e.message);
     } finally {
@@ -70,7 +78,7 @@ export default function LLMSettingsScreen() {
         {configs.map(cfg => (
           <View key={cfg.id} style={{ backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 18, padding: 14, borderWidth: cfg.is_active ? 2 : 0.5, borderColor: cfg.is_active ? '#D4703A' : '#CFC2AE' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ flex: 1, fontWeight: '700', color: '#3B2212', fontSize: 15 }}>{cfg.label || cfg.provider}</Text>
+              <Text style={{ flex: 1, fontWeight: '700', color: '#3B2212', fontSize: 15 }}>{cfg.name || cfg.provider}</Text>
               {cfg.is_active && <View style={{ backgroundColor: '#D4703A', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>ACTIVE</Text></View>}
             </View>
             <Text style={{ color: '#7A6150', fontSize: 13 }}>{cfg.provider} · {cfg.model || 'default'}</Text>
@@ -88,7 +96,7 @@ export default function LLMSettingsScreen() {
         {/* Add / edit form */}
         <Text style={{ fontSize: 14, fontWeight: '700', color: '#3B2212', marginTop: 8 }}>{editing ? 'edit config' : 'add config'}</Text>
 
-        <TextInput value={form.label} onChangeText={v => setForm(f => ({...f, label: v}))} placeholder="label (eg. claude fast)" placeholderTextColor="#9A8374" style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, borderWidth: 0.5, borderColor: '#CFC2AE', paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: '#3B2212' }}/>
+        <TextInput value={form.name} onChangeText={v => setForm(f => ({...f, name: v}))} placeholder="name (eg. claude fast)" placeholderTextColor="#9A8374" style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, borderWidth: 0.5, borderColor: '#CFC2AE', paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: '#3B2212' }}/>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {PROVIDERS.map(p => <GlassPill key={p} active={form.provider === p} onPress={() => setForm(f => ({...f, provider: p}))}>{p}</GlassPill>)}
@@ -99,7 +107,7 @@ export default function LLMSettingsScreen() {
         <TextInput value={form.model} onChangeText={v => setForm(f => ({...f, model: v}))} placeholder="model (leave blank for default)" placeholderTextColor="#9A8374" style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, borderWidth: 0.5, borderColor: '#CFC2AE', paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: '#3B2212' }}/>
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {editing && <TouchableOpacity onPress={() => { setEditing(null); setForm({ provider: 'anthropic', model: '', api_key: '', label: '' }); }} style={{ flex: 1, backgroundColor: 'rgba(200,185,165,0.4)', borderRadius: 999, paddingVertical: 13, alignItems: 'center' }}><Text style={{ color: '#7A6150', fontWeight: '600' }}>cancel</Text></TouchableOpacity>}
+          {editing && <TouchableOpacity onPress={() => { setEditing(null); setForm({ provider: 'anthropic', model: '', api_key: '', name: '' }); }} style={{ flex: 1, backgroundColor: 'rgba(200,185,165,0.4)', borderRadius: 999, paddingVertical: 13, alignItems: 'center' }}><Text style={{ color: '#7A6150', fontWeight: '600' }}>cancel</Text></TouchableOpacity>}
           <TouchableOpacity onPress={save} style={{ flex: 1, backgroundColor: '#D4703A', borderRadius: 999, paddingVertical: 13, alignItems: 'center' }}><Text style={{ color: 'white', fontWeight: '700' }}>{editing ? 'update' : 'add'}</Text></TouchableOpacity>
         </View>
       </ScrollView>

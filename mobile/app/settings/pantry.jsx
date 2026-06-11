@@ -30,7 +30,13 @@ export default function PantryScreen() {
   async function addItem(name) {
     const text = (name || newItem).trim();
     if (!text) return;
-    const created = await post(ENDPOINT[tab], { ingredient_name: text, name: text }).catch(() => null);
+    // Each tab hits a different route with a different required field:
+    //   food → pantry (ingredient_name), freezer → recipe_name, equipment → name.
+    const body =
+      tab === 'freezer'   ? { recipe_name: text } :
+      tab === 'equipment' ? { name: text } :
+                            { ingredient_name: text };
+    const created = await post(ENDPOINT[tab], body).catch(() => null);
     if (created) setItems(prev => [...prev, created]);
     if (!name) setNewItem('');
   }
@@ -64,8 +70,8 @@ export default function PantryScreen() {
         renderItem={({ item }) => (
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 14, padding: 13, marginBottom: 8 }}>
             <Text style={{ flex: 1, color: '#3B2212', fontSize: 14 }}>
-              {item.ingredient_name || item.name || item.label}
-              {item.expiry_date && <Text style={{ color: '#9A8374', fontSize: 12 }}>  · {item.expiry_date}</Text>}
+              {item.ingredient_name || item.recipe_name || item.name || item.label}
+              {item.use_by_date && <Text style={{ color: '#9A8374', fontSize: 12 }}>  · {item.use_by_date}</Text>}
             </Text>
             <TouchableOpacity onPress={() => removeItem(item.id)}>
               <Text style={{ color: '#9A8374', fontSize: 18 }}>×</Text>

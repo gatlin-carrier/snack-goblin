@@ -5,3 +5,12 @@ node_modules/
 mobile/ios/
 mobile/android/
 mobile/.expo/
+frontend/dist/
+
+# SQLite database files (incl. WAL/SHM sidecars) — never commit
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

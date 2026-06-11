@@ -14,7 +14,7 @@ function FieldLabel({ children }) {
 }
 
 export default function HouseholdPanel({ onClose, showToast }) {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,7 +37,12 @@ export default function HouseholdPanel({ onClose, showToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const isFounder = household?.members?.find(m => m.role === 'founder');
+  // Whether the CURRENT user is the founder — not merely whether a founder exists
+  // (every household has one). Compares the signed-in email to the founder member.
+  const myEmail = (user?.email || '').toLowerCase();
+  const isFounder = !!household?.members?.some(
+    m => m.role === 'founder' && (m.email || '').toLowerCase() === myEmail
+  );
 
   async function rename() {
     setSavingName(true);

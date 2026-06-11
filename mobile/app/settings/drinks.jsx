@@ -12,13 +12,26 @@ export default function DrinksScreen() {
   const [settings, setSettings] = useState({ milk_type: 'whole', daily_milk_oz: '', daily_juice_oz: '', logger_enabled: false });
 
   useEffect(() => {
+    // Backend shape: { standing: { milk, juice, water }, milk_type, logger_enabled }.
     get('/api/drinks/settings').then(d => {
-      if (d) setSettings({ milk_type: d.milk_type || 'whole', daily_milk_oz: d.daily_milk_oz?.toString() || '', daily_juice_oz: d.daily_juice_oz?.toString() || '', logger_enabled: d.logger_enabled || false });
+      if (d) setSettings({
+        milk_type: d.milk_type || 'whole',
+        daily_milk_oz: d.standing?.milk != null ? String(d.standing.milk) : '',
+        daily_juice_oz: d.standing?.juice != null ? String(d.standing.juice) : '',
+        logger_enabled: d.logger_enabled || false,
+      });
     }).catch(() => {});
   }, []);
 
   async function save() {
-    await put('/api/drinks/settings', { ...settings, daily_milk_oz: parseFloat(settings.daily_milk_oz) || null, daily_juice_oz: parseFloat(settings.daily_juice_oz) || null }).catch(() => {});
+    await put('/api/drinks/settings', {
+      milk_type: settings.milk_type,
+      logger_enabled: settings.logger_enabled,
+      standing: {
+        milk: parseFloat(settings.daily_milk_oz) || 0,
+        juice: parseFloat(settings.daily_juice_oz) || 0,
+      },
+    }).catch(() => {});
     router.back();
   }
 

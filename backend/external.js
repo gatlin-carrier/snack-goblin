@@ -17,12 +17,22 @@ function getMondayISO(d = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+const crypto = require('crypto');
+
+// Constant-time token comparison to avoid leaking the token via response timing.
+function tokensMatch(provided, expected) {
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false; // timingSafeEqual requires equal lengths
+  return crypto.timingSafeEqual(a, b);
+}
+
 function bearerAuth(req, res, next) {
   const expected = process.env.INTEGRATION_TOKEN;
   if (!expected) return res.status(503).json({ error: 'INTEGRATION_TOKEN not configured' });
   const header = req.headers.authorization || '';
   const provided = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (provided !== expected) return res.status(401).json({ error: 'unauthorized' });
+  if (!tokensMatch(provided, expected)) return res.status(401).json({ error: 'unauthorized' });
   next();
 }
 

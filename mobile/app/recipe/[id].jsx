@@ -24,8 +24,10 @@ export default function RecipeScreen() {
   }, [id]);
 
   async function rateRecipe(stars) {
-    setRating(stars);
-    await post(`/api/recipes/${id}/rate`, { rating: stars }).catch(() => {});
+    const value = Math.max(1, Math.min(5, Math.round(stars)));
+    setRating(value);
+    // Backend reads req.body.stars and requires an integer 1–5.
+    await post(`/api/recipes/${id}/rate`, { stars: value }).catch(() => {});
   }
 
   async function deleteRecipe() {

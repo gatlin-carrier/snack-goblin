@@ -14,7 +14,8 @@ export function GoblinChat({ onClose }) {
   const flatRef = useRef(null);
 
   useEffect(() => {
-    get('/api/goblin/chat').then(d => setMessages(d.messages || [])).catch(() => {});
+    // GET returns a bare array of { id, role, content, created_at }.
+    get('/api/goblin/chat').then(d => setMessages(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -29,8 +30,9 @@ export function GoblinChat({ onClose }) {
     setMessages(m => [...m, optimistic]);
     setLoading(true);
     try {
+      // POST returns { reply: string } — append it to the existing thread.
       const data = await post('/api/goblin/chat', { message: text });
-      setMessages(data.messages || []);
+      setMessages(m => [...m, { role: 'assistant', content: data.reply, id: Date.now() + 1 }]);
     } catch {
       setMessages(m => m.filter(msg => msg.id !== optimistic.id));
     } finally {

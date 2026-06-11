@@ -21,22 +21,35 @@ export function PrefsProvider({ children }) {
 
   useEffect(() => {
     if (!session) { setPrefs(DEFAULTS); setLoaded(false); return; }
+    let cancelled = false;
     fetch('/api/user-prefs')
-      .then(r => r.json())
-      .then(data => { setPrefs({ ...DEFAULTS, ...data }); setLoaded(true); })
-      .catch(() => setLoaded(true));
+      .then(async r => {
+        if (!r.ok) throw new Error(`prefs fetch failed: ${r.status}`);
+        return r.json();
+      })
+      .then(data => { if (!cancelled) { setPrefs({ ...DEFAULTS, ...data }); setLoaded(true); } })
+      // Do NOT mark loaded on failure: a transient 401/500 would otherwise fall
+      // back to DEFAULTS (onboarding_complete:false) and wrongly re-run onboarding
+      // over an already-onboarded user's saved prefs.
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [session]);
 
   const update = useCallback(async (patch) => {
     setPrefs(p => ({ ...p, ...patch }));
-    const res = await fetch('/api/user-prefs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    const fresh = await res.json();
-    setPrefs({ ...DEFAULTS, ...fresh });
-    return fresh;
+    try {
+      const res = await fetch('/api/user-prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) return patch; // keep optimistic state; never throw into callers
+      const fresh = await res.json();
+      setPrefs({ ...DEFAULTS, ...fresh });
+      return fresh;
+    } catch {
+      return patch; // network error — keep optimistic state so the UI isn't stuck
+    }
   }, []);
 
   return (
